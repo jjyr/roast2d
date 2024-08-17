@@ -118,7 +118,7 @@ pub(crate) fn map_draw(render: &mut Render, map: &Map, mut offset: Vec2) {
     offset /= map.distance;
 
     for tile in map.data.iter() {
-        let pos = tile.dst + offset;
+        let pos = tile.dst - offset;
         map_draw_tile(render, map, tile, pos);
     }
 }

@@ -188,6 +188,10 @@ impl Render {
         self.view_size
     }
 
+    pub(crate) fn logical_size(&self) -> Vec2 {
+        self.logical_size
+    }
+
     pub(crate) fn set_view_size(&mut self, size: Vec2) {
         self.view_size = size;
     }

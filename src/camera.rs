@@ -93,16 +93,15 @@ impl Camera {
 
             let deadzone_target = self.deadzone_pos + self.deadzone * 0.5;
             self.pos = deadzone_target + self.look_ahead_target;
+        }
+        let diff = self.viewport_target(screen_size, bounds) - self.viewport;
+        self.vel = diff * self.speed;
 
-            let diff = self.viewport_target(screen_size, bounds) - self.viewport;
-            self.vel = diff + self.speed;
-
-            if self.snap
-                || self.vel.x.abs() + self.vel.y.abs() > self.min_vel.x.abs() + self.min_vel.y.abs()
-            {
-                self.viewport += self.vel * tick;
-                self.snap = false;
-            }
+        if self.snap
+            || self.vel.x.abs() + self.vel.y.abs() > self.min_vel.x.abs() + self.min_vel.y.abs()
+        {
+            self.viewport += self.vel * tick;
+            self.snap = false;
         }
     }
 

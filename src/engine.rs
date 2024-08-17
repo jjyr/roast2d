@@ -496,7 +496,7 @@ impl Engine {
             .and_then(|ent_ref| self.world.get(ent_ref));
         let bounds = self.collision_map.as_ref().map(|map| map.bounds());
         self.camera
-            .update(self.tick, self.render.screen_size, camera_follow, bounds);
+            .update(self.tick, self.render.logical_size(), camera_follow, bounds);
 
         self.perf.update = self.now() - time_real_now;
 
