@@ -1,0 +1,28 @@
+[package]
+name = "roast-2d"
+version = "0.0.2"
+edition = "2021"
+authors = ["jjy"]
+license = "MIT"
+repository = "https://github.com/jjyr/roast2d"
+description = "Roast2D is a homebrew 2D game engine inspired by high_impact"
+
+[features]
+debug_mut = []
+
+[dependencies]
+anyhow = "1.0.86"
+bitflags = "2.6.0"
+dyn-clone = "1.0.17"
+glam = "0.28.0"
+image = { version = "0.25.2", default-features = false, features = ["png"] }
+rusttype = "0.9.3"
+sdl2 = { version = "0.37.0", features = ["unsafe_textures"] }
+serde = { version = "1.0.207", features = ["derive"] }
+serde_json = "1.0.124"
+
+[lints.clippy]
+too_many_arguments = "allow"
+
+[dev-dependencies]
+rand = "0.8.5"
