@@ -619,6 +619,11 @@ impl Engine {
         self.commands.add(Command::Message { ent, msg_id, data });
     }
 
+    /// Move entity
+    pub fn move_ent(&mut self, ent: &mut Entity, vstep: Vec2) {
+        entity_move(self, ent, vstep);
+    }
+
     pub(crate) fn handle_commands(&mut self) {
         let commands = self.commands.take();
         for command in commands {
