@@ -21,6 +21,8 @@ macro_rules! with_ent {
         if let Some(mut instance) = $ent.instance.take() {
             $f(&mut instance);
             $ent.instance.replace(instance);
+        } else {
+            eprintln!("Can't get entity instance {:?}", $ent.ent_ref)
         }
     };
 }
@@ -200,10 +202,11 @@ pub trait EntityType: DynClone {
     /// Load entity settings
     fn settings(&mut self, _eng: &mut Engine, _ent: &mut Entity, _settings: serde_json::Value) {}
 
-    /// Update the entity, you may want to call entity_base_update if this function is override
-    fn update(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        eng.entity_base_update(ent)
-    }
+    /// Update callback is called before the entity_base_update
+    fn update(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
+
+    /// Post update callback is called after the entity_base_update
+    fn post_update(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
 
     // Draw entity anim
     fn draw(&self, eng: &mut Engine, ent: &mut Entity, viewport: Vec2) {

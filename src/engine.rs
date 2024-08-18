@@ -337,7 +337,7 @@ impl Engine {
     }
 
     /// Entity base update, handle physics velocities
-    pub fn entity_base_update(&mut self, ent: &mut Entity) {
+    pub(crate) fn entity_base_update(&mut self, ent: &mut Entity) {
         if !ent.physics.contains(EntityPhysics::MOVE) {
             return;
         }
@@ -374,6 +374,10 @@ impl Engine {
             let mut ent = ent.borrow_mut();
             with_ent!(ent, |instance: &mut Box<dyn EntityType>| {
                 instance.update(self, &mut ent);
+            });
+            self.entity_base_update(&mut ent);
+            with_ent!(ent, |instance: &mut Box<dyn EntityType>| {
+                instance.post_update(self, &mut ent);
             });
 
             if !ent.alive {

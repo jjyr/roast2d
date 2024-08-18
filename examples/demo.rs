@@ -78,8 +78,7 @@ impl EntityType for Ball {
         }
     }
 
-    fn update(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        eng.entity_base_update(ent);
+    fn post_update(&mut self, eng: &mut Engine, ent: &mut Entity) {
         let view = eng.view_size();
         if ent.pos.x < -ent.size.x {
             ent.pos.x = 0.0;
@@ -234,8 +233,6 @@ impl EntityType for Player {
         if input.pressed(&Action::Left.into()) {
             ent.vel.x = -PLAYER_VEL;
         }
-
-        eng.entity_base_update(ent);
     }
 
     fn touch(&mut self, _eng: &mut Engine, ent: &mut Entity, other: &mut Entity) {
