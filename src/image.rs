@@ -75,7 +75,7 @@ impl Image {
         flip_y: bool,
     ) {
         let cols =
-            ((self.size().x as f32 - self.padding) / (tile_size.x + self.spacing)).ceil() as u32;
+            ((self.size().x as f32 - self.padding) / (tile_size.x + self.spacing)).round() as u32;
         let row = tile as u32 / cols;
         let col = tile as u32 % cols;
         let src_pos = Vec2::new(

@@ -90,12 +90,17 @@ impl Render {
         self.draw_calls += 1;
         if let Some(screen_buffer) = self.screen_buffer.as_mut() {
             let src = Rect::new(
-                uv_offset.x as i32,
-                uv_offset.y as i32,
-                uv_size.x as u32,
-                uv_size.y as u32,
+                uv_offset.x.round() as i32,
+                uv_offset.y.round() as i32,
+                uv_size.x.round() as u32,
+                uv_size.y.round() as u32,
             );
-            let dst = Rect::new(pos.x as i32, pos.y as i32, size.x as u32, size.y as u32);
+            let dst = Rect::new(
+                pos.x.round() as i32,
+                pos.y.round() as i32,
+                size.x.round() as u32,
+                size.y.round() as u32,
+            );
             if let Err(err) = screen_buffer
                 .canvas
                 .copy_ex(texture, src, dst, 0.0, None, flip_x, flip_y)
