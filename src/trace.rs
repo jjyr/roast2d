@@ -166,8 +166,8 @@ fn resolve_full_tile(
     tile_pos: IVec2,
     res: &mut Trace,
 ) {
-    // The minimum resulting x or y position in case of a collision. Only
-    // the x or y coordinate is correct - depending on if we enter the tile
+    // Resolved position, the minimum resulting x or y position in case of a collision.
+    // Only the x or y coordinate is correct - depending on if we enter the tile
     // horizontaly or vertically. We will recalculate the wrong one again.
 
     let mut rp: Vec2 = Vec2::new(
@@ -178,6 +178,7 @@ fn resolve_full_tile(
         if vel.y > 0. { -size.y } else { map.tile_size },
     );
 
+    // The steps from pos to rp
     let length;
 
     // If we don't move in Y direction, or we do move in X and the tile

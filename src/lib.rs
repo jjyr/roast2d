@@ -9,7 +9,7 @@ mod entity;
 mod font;
 mod image;
 mod input;
-mod ldtk;
+pub mod ldtk;
 mod map;
 mod platform;
 pub mod prelude;

@@ -305,6 +305,11 @@ impl World {
             .cloned()
     }
 
+    /// Get an entity by ref
+    pub fn entities(&self) -> impl Iterator<Item = &Mut<Entity>> {
+        self.entities.iter()
+    }
+
     /// Spawn a new entity
     pub(crate) fn spawn(&mut self, mut ent: Entity) -> EntityRef {
         let id = self.unique_id;

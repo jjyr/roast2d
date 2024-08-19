@@ -397,13 +397,14 @@ impl InputState {
     }
 
     /// Bind a keycode to an action
-    pub fn bind(&mut self, code: KeyCode, action: ActionId) {
+    pub fn bind<Action: Into<ActionId>>(&mut self, code: KeyCode, action: Action) {
         if code == KeyCode::Invalid {
             eprintln!("bind: Invalid key code");
             return;
         }
-        self.actions_state.insert(action, KeyState::default());
-        self.bindings.insert(code, action);
+        let id = action.into();
+        self.actions_state.insert(id, KeyState::default());
+        self.bindings.insert(code, id);
     }
 
     /// Get action of a keycode
@@ -422,28 +423,28 @@ impl InputState {
     }
 
     /// Get key state
-    pub fn get_state(&self, action: &ActionId) -> Option<&KeyState> {
-        self.actions_state.get(action)
+    pub fn get_state<Action: Into<ActionId>>(&self, action: Action) -> Option<&KeyState> {
+        self.actions_state.get(&action.into())
     }
 
     /// Key is pressed
-    pub fn pressed(&self, action: &ActionId) -> bool {
+    pub fn pressed<Action: Into<ActionId>>(&self, action: Action) -> bool {
         self.get_state(action).is_some_and(|s| s.is_down())
     }
 
     /// Key is released
-    pub fn released(&self, action: &ActionId) -> bool {
+    pub fn released<Action: Into<ActionId>>(&self, action: Action) -> bool {
         self.get_state(action).map(|s| s.is_up()).unwrap_or(true)
     }
 
     /// Key is just pressed
-    pub fn just_pressed(&self, action: &ActionId) -> bool {
-        self.actions_pressed.contains(action)
+    pub fn just_pressed<Action: Into<ActionId>>(&self, action: Action) -> bool {
+        self.actions_pressed.contains(&action.into())
     }
 
     /// Key is just released
-    pub fn just_released(&self, action: &ActionId) -> bool {
-        self.actions_released.contains(action)
+    pub fn just_released<Action: Into<ActionId>>(&self, action: Action) -> bool {
+        self.actions_released.contains(&action.into())
     }
 
     /// Get mouse pos

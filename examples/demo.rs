@@ -227,10 +227,10 @@ impl EntityType for Player {
         let input = eng.input();
 
         ent.accel = Vec2::default();
-        if input.pressed(&Action::Right.into()) {
+        if input.pressed(Action::Right) {
             ent.vel.x = PLAYER_VEL;
         }
-        if input.pressed(&Action::Left.into()) {
+        if input.pressed(Action::Left) {
             ent.vel.x = -PLAYER_VEL;
         }
     }
@@ -271,10 +271,10 @@ impl Scene for Demo {
 
         // bind keys
         let input = eng.input_mut();
-        input.bind(KeyCode::Left, Action::Left.into());
-        input.bind(KeyCode::Right, Action::Right.into());
-        input.bind(KeyCode::KeyA, Action::Left.into());
-        input.bind(KeyCode::KeyD, Action::Right.into());
+        input.bind(KeyCode::Left, Action::Left);
+        input.bind(KeyCode::Right, Action::Right);
+        input.bind(KeyCode::KeyA, Action::Left);
+        input.bind(KeyCode::KeyD, Action::Right);
 
         // TODO the font path only works on MacOS
         let font_path = "/Library/Fonts/Arial Unicode.ttf";

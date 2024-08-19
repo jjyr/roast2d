@@ -3,6 +3,7 @@ use std::{
     rc::Rc,
 };
 
+use anyhow::Result;
 pub use glam::Vec2;
 
 /// Rect
@@ -36,6 +37,18 @@ impl<T: ?Sized> Mut<T> {
     #[cfg_attr(feature = "debug_mut", track_caller)]
     pub fn borrow_mut(&self) -> RefMut<'_, T> {
         self.0.borrow_mut()
+    }
+
+    #[cfg_attr(feature = "debug_mut", track_caller)]
+    pub fn try_borrow(&self) -> Result<Ref<'_, T>> {
+        let r = self.0.try_borrow()?;
+        Ok(r)
+    }
+
+    #[cfg_attr(feature = "debug_mut", track_caller)]
+    pub fn try_borrow_mut(&self) -> Result<RefMut<'_, T>> {
+        let r = self.0.try_borrow_mut()?;
+        Ok(r)
     }
 }
 

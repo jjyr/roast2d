@@ -529,6 +529,8 @@ impl Engine {
         self.world.reset_entities();
         self.background_maps.clear();
         self.collision_map.take();
+        self.commands.take();
+        self.input.clear();
 
         for (index, layer) in level.layer_instances.iter().enumerate() {
             match layer.r#type {

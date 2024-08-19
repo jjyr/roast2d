@@ -35,8 +35,8 @@ mod tests {
     fn test_rand_sort() {
         let mut rng = thread_rng();
         let list: [u8; 16] = rng.r#gen();
-        let mut l1 = list.clone();
-        let mut l2 = list.clone();
+        let mut l1 = list;
+        let mut l2 = list;
         insertion_sort(&mut l1);
         l2.sort();
         assert_eq!(l1, l2);
