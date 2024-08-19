@@ -315,7 +315,7 @@ impl Engine {
         let px_viewport = self.render.render_snap_px(self.camera.viewport);
 
         // Background maps
-        for map in &self.background_maps {
+        for map in self.background_maps.iter().rev() {
             if !map.foreground {
                 map_draw(&mut self.render, map, px_viewport);
             }
@@ -324,8 +324,8 @@ impl Engine {
         self.entities_draw(px_viewport);
 
         // Foreground maps
-        for map in &self.background_maps {
-            if !map.foreground {
+        for map in self.background_maps.iter().rev() {
+            if map.foreground {
                 map_draw(&mut self.render, map, px_viewport);
             }
         }

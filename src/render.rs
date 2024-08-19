@@ -74,6 +74,8 @@ impl Render {
         texture: &Texture,
         uv_offset: Vec2,
         uv_size: Vec2,
+        flip_x: bool,
+        flip_y: bool,
     ) {
         if pos.x > self.logical_size.x
             || pos.y > self.logical_size.y
@@ -94,7 +96,10 @@ impl Render {
                 uv_size.y as u32,
             );
             let dst = Rect::new(pos.x as i32, pos.y as i32, size.x as u32, size.y as u32);
-            if let Err(err) = screen_buffer.canvas.copy(texture, src, dst) {
+            if let Err(err) = screen_buffer
+                .canvas
+                .copy_ex(texture, src, dst, 0.0, None, flip_x, flip_y)
+            {
                 eprintln!("SDL render_draw {err}");
             }
         }
