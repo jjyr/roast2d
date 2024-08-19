@@ -73,22 +73,37 @@ impl Map {
         let name = layer.identifier.clone();
         let distance: f32 = level.get_nth(DISTANCE, layer_index, DEFAULT_DISTANCE)?;
         let foreground: bool = level.get_nth(FOREGROUND, layer_index, false)?;
-        let data = layer
-            .auto_layer_tiles
-            .iter()
-            .map(|auto_tile| {
-                let flip_x = auto_tile.x_flip();
-                let flip_y = auto_tile.y_flip();
-                let tile_id = auto_tile.t;
-                let dst = Vec2::new(auto_tile.px.0 as f32, auto_tile.px.1 as f32);
-                Tile {
-                    flip_x,
-                    flip_y,
-                    tile_id,
-                    dst,
-                }
-            })
-            .collect();
+        let mut data = Vec::with_capacity(layer.auto_layer_tiles.len() + layer.grid_tiles.len());
+
+        // Read auto layer tiles
+        let auto_tiles = layer.auto_layer_tiles.iter().map(|auto_tile| {
+            let flip_x = auto_tile.x_flip();
+            let flip_y = auto_tile.y_flip();
+            let tile_id = auto_tile.t;
+            let dst = Vec2::new(auto_tile.px.0 as f32, auto_tile.px.1 as f32);
+            Tile {
+                flip_x,
+                flip_y,
+                tile_id,
+                dst,
+            }
+        });
+        data.extend(auto_tiles);
+
+        // Read tiles
+        let tiles = layer.grid_tiles.iter().map(|auto_tile| {
+            let flip_x = auto_tile.x_flip();
+            let flip_y = auto_tile.y_flip();
+            let tile_id = auto_tile.t;
+            let dst = Vec2::new(auto_tile.px.0 as f32, auto_tile.px.1 as f32);
+            Tile {
+                flip_x,
+                flip_y,
+                tile_id,
+                dst,
+            }
+        });
+        data.extend(tiles);
 
         let map = Map {
             name,

@@ -240,7 +240,8 @@ pub struct LdtkLevelLayerInstance {
     pub level_id: usize,
     pub layer_def_uid: usize,
     pub entity_instances: Vec<LdtkEntityInstance>,
-    pub auto_layer_tiles: Vec<LdtkAutoLayerTile>,
+    pub auto_layer_tiles: Vec<LdtkTile>,
+    pub grid_tiles: Vec<LdtkTile>,
     pub int_grid_csv: Vec<u16>,
 }
 
@@ -287,16 +288,16 @@ impl LdtkEntityInstance {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct LdtkAutoLayerTile {
+pub struct LdtkTile {
     pub px: LdtkGrid,
     pub src: LdtkGrid,
     pub f: u8,
     pub t: u16,
-    pub d: LdtkGrid,
+    pub d: Vec<u16>,
     pub a: u16,
 }
 
-impl LdtkAutoLayerTile {
+impl LdtkTile {
     pub fn x_flip(&self) -> bool {
         (self.f & 0b01) != 0
     }

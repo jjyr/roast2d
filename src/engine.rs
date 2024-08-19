@@ -538,7 +538,7 @@ impl Engine {
                     let map = CollisionMap::from_ldtk_layer(layer)?;
                     self.collision_map.replace(map);
                 }
-                LayerType::AutoLayer => {
+                LayerType::AutoLayer | LayerType::Tiles => {
                     let map = Map::from_ldtk_layer(proj, level, index, layer, &mut self.render)?;
                     self.background_maps.push(map);
                 }
@@ -556,10 +556,7 @@ impl Engine {
                     }
                 }
                 _ => {
-                    eprintln!(
-                        "Ignore layer {}, because read from {:?} is unimplemented",
-                        layer.identifier, layer.r#type
-                    );
+                    eprintln!("Ignore layer {} {:?}", layer.identifier, layer.r#type);
                 }
             }
         }
