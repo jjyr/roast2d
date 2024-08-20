@@ -1,8 +1,51 @@
 use anyhow::Result;
+use glam::UVec2;
 
 use crate::{engine::Engine, platform};
 
-/// Run the game
-pub fn run(mut engine: Engine, title: String, width: u32, height: u32) -> Result<()> {
-    platform::sdl::init(&mut engine, title, width, height)
+#[derive(Debug)]
+pub struct App {
+    pub title: String,
+    pub window: UVec2,
+    pub vsync: bool,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            title: "Hello Roast2D".to_string(),
+            window: UVec2::new(800, 600),
+            vsync: false,
+        }
+    }
+}
+
+impl App {
+    pub fn title(mut self, title: String) -> Self {
+        self.title = title;
+        self
+    }
+
+    pub fn window(mut self, window: UVec2) -> Self {
+        self.window = window;
+        self
+    }
+
+    pub fn vsync(mut self, vsync: bool) -> Self {
+        self.vsync = vsync;
+        self
+    }
+
+    /// Run the game
+    pub fn run<Setup: FnOnce(&mut Engine)>(self, setup: Setup) -> Result<()> {
+        let App {
+            title,
+            window: UVec2 {
+                x: width,
+                y: height,
+            },
+            vsync,
+        } = self;
+        platform::sdl::init(title, width, height, vsync, setup)
+    }
 }

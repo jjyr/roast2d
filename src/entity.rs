@@ -1,5 +1,5 @@
 use std::{
-    any::{type_name, Any, TypeId},
+    any::{Any, TypeId},
     collections::HashMap,
     rc::Rc,
 };
@@ -196,6 +196,15 @@ pub struct EntityRef {
 
 /// EntityDef
 pub trait EntityType: DynClone {
+    /// Load an entity type
+    ///
+    /// This function called only once on EntityType registration.
+    /// Assets loading should be done in this callback,
+    /// all Entity instances are cloned from this one when spawn is called.
+    fn load(_eng: &mut Engine) -> Self
+    where
+        Self: Sized;
+
     /// Initialize an entity
     fn init(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
 
@@ -271,18 +280,6 @@ pub struct World {
 }
 
 impl World {
-    /// Registry an entity type
-    pub fn add_entity_type<T: EntityType + Default + Clone + 'static>(&mut self) {
-        let type_id = EntityTypeId::of::<T>();
-        let ent_type: Rc<dyn EntityType> = Rc::new(T::default());
-        self.entity_types.insert(type_id.clone(), ent_type);
-        let name = type_name::<T>()
-            .split("::")
-            .last()
-            .expect("can't get name of entity type");
-        self.name_to_entity_types.insert(name.to_string(), type_id);
-    }
-
     /// Get an entity type instance
     pub(crate) fn get_entity_type_instance(
         &self,

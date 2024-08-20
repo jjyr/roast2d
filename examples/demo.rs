@@ -1,6 +1,7 @@
 extern crate roast_2d;
 use std::cell::{OnceCell, RefCell};
 
+use glam::UVec2;
 use roast_2d::prelude::*;
 
 const BALL_ACCEL: f32 = 200.0;
@@ -44,16 +45,25 @@ impl From<Action> for ActionId {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct Ball;
+#[derive(Clone)]
+pub struct Ball {
+    size: Vec2,
+    anim: Animation,
+}
 
 impl EntityType for Ball {
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        ent.size = Vec2::new(32.0, 32.0);
+    fn load(eng: &mut Engine) -> Self {
+        let size = Vec2::new(32., 32.0);
         let mut sheet = load_texture(eng);
-        sheet.scale = ent.size / SPRITE_SIZE;
+        sheet.scale = size / SPRITE_SIZE;
         sheet.color = Color::rgb(0xfb, 0xf2, 0x36);
-        ent.anim = Some(Animation::new(sheet));
+        let anim = Animation::new(sheet);
+        Ball { size, anim }
+    }
+
+    fn init(&mut self, _eng: &mut Engine, ent: &mut Entity) {
+        ent.size = self.size;
+        ent.anim = Some(self.anim.clone());
         ent.group = EntityGroup::PROJECTILE;
         ent.accel.y = -BALL_ACCEL * 2.0;
         ent.friction = Vec2::splat(0.1);
@@ -99,10 +109,13 @@ impl EntityType for Ball {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct LeftWall;
 
 impl EntityType for LeftWall {
+    fn load(_eng: &mut Engine) -> Self {
+        Self
+    }
     fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
         ent.size = Vec2::new(WALL_THICK, eng.view_size().y);
         ent.check_against = EntityGroup::PROJECTILE;
@@ -110,10 +123,13 @@ impl EntityType for LeftWall {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct RightWall;
 
 impl EntityType for RightWall {
+    fn load(_eng: &mut Engine) -> Self {
+        Self
+    }
     fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
         ent.size = Vec2::new(WALL_THICK, eng.view_size().y);
         ent.check_against = EntityGroup::PROJECTILE;
@@ -121,10 +137,13 @@ impl EntityType for RightWall {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct TopWall;
 
 impl EntityType for TopWall {
+    fn load(_eng: &mut Engine) -> Self {
+        Self
+    }
     fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
         ent.size = Vec2::new(eng.view_size().x, WALL_THICK);
         ent.check_against = EntityGroup::PROJECTILE;
@@ -132,10 +151,13 @@ impl EntityType for TopWall {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct BottomWall;
 
 impl EntityType for BottomWall {
+    fn load(_eng: &mut Engine) -> Self {
+        Self
+    }
     fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
         ent.size = Vec2::new(eng.view_size().x, WALL_THICK);
         ent.check_against = EntityGroup::PROJECTILE;
@@ -143,19 +165,30 @@ impl EntityType for BottomWall {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct Brick {
     hit: bool,
     dying: f32,
     dead_pos: Vec2,
+    anim: Animation,
 }
 
 impl EntityType for Brick {
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
+    fn load(eng: &mut Engine) -> Self {
         let mut sheet = load_texture(eng);
         sheet.scale = BRICK_SIZE / SPRITE_SIZE;
         sheet.color = Color::rgb(0x5b, 0x6e, 0xe1);
-        ent.anim = Some(Animation::new(sheet));
+        let anim = Animation::new(sheet);
+        Brick {
+            hit: false,
+            dying: 0.0,
+            dead_pos: Vec2::default(),
+            anim,
+        }
+    }
+
+    fn init(&mut self, _eng: &mut Engine, ent: &mut Entity) {
+        ent.anim = Some(self.anim.clone());
         ent.size = BRICK_SIZE;
         ent.check_against = EntityGroup::PROJECTILE;
         ent.physics = EntityPhysics::ACTIVE;
@@ -208,16 +241,26 @@ impl EntityType for Brick {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct Player;
+#[derive(Clone)]
+pub struct Player {
+    size: Vec2,
+    anim: Animation,
+}
 
 impl EntityType for Player {
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
+    fn load(eng: &mut Engine) -> Self {
         let mut sheet = load_texture(eng);
-        ent.size = Vec2::new(128.0, 48.0);
-        sheet.scale = ent.size / SPRITE_SIZE;
+        let size = Vec2::new(128.0, 48.0);
+        sheet.scale = size / SPRITE_SIZE;
         sheet.color = Color::rgb(0x37, 0x94, 0x6e);
-        ent.anim = Some(Animation::new(sheet));
+        let anim = Animation::new(sheet);
+
+        Self { size, anim }
+    }
+
+    fn init(&mut self, _eng: &mut Engine, ent: &mut Entity) {
+        ent.size = self.size;
+        ent.anim = Some(self.anim.clone());
         ent.friction = Vec2::splat(FRICTION);
         ent.check_against = EntityGroup::PROJECTILE;
         ent.physics = EntityPhysics::ACTIVE;
@@ -346,24 +389,27 @@ impl Scene for Demo {
 }
 
 fn main() {
-    let mut eng = Engine::new();
-    // set resize and scale
-    eng.set_view_size(Vec2::new(800.0, 600.0));
-    eng.set_scale_mode(ScaleMode::Exact);
-    eng.set_resize_mode(ResizeMode {
-        width: true,
-        height: true,
-    });
-    eng.set_sweep_axis(SweepAxis::Y);
-    eng.add_entity_type::<Player>();
-    eng.add_entity_type::<LeftWall>();
-    eng.add_entity_type::<RightWall>();
-    eng.add_entity_type::<TopWall>();
-    eng.add_entity_type::<BottomWall>();
-    eng.add_entity_type::<Ball>();
-    eng.add_entity_type::<Brick>();
-    eng.set_scene(Demo::default());
-    if let Err(err) = run(eng, "Hello Roast2D".to_string(), 800, 600) {
-        eprintln!("Exit because {err}")
-    }
+    App::default()
+        .title("Hello Roast2D".to_string())
+        .window(UVec2::new(800, 600))
+        .vsync(true)
+        .run(|eng: &mut Engine| {
+            // set resize and scale
+            eng.set_view_size(Vec2::new(800.0, 600.0));
+            eng.set_scale_mode(ScaleMode::Exact);
+            eng.set_resize_mode(ResizeMode {
+                width: true,
+                height: true,
+            });
+            eng.set_sweep_axis(SweepAxis::Y);
+            eng.add_entity_type::<Player>();
+            eng.add_entity_type::<LeftWall>();
+            eng.add_entity_type::<RightWall>();
+            eng.add_entity_type::<TopWall>();
+            eng.add_entity_type::<BottomWall>();
+            eng.add_entity_type::<Ball>();
+            eng.add_entity_type::<Brick>();
+            eng.set_scene(Demo::default());
+        })
+        .expect("Start game");
 }

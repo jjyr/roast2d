@@ -57,15 +57,14 @@ struct PlatformSDL {
 }
 
 impl PlatformSDL {
-    fn video_init(&mut self, render: &mut Render) -> Result<()> {
+    fn video_init(&mut self, vsync: bool) -> Result<ScreenBuffer> {
         let mut builder = self.window.clone().into_canvas();
-        if render.vsync {
+        if vsync {
             builder = builder.present_vsync();
         }
         let canvas = builder.build().map_err(|e| anyhow!(e))?;
         let screen_buffer = ScreenBuffer::new(canvas);
-        render.set_screen_buffer(screen_buffer);
-        Ok(())
+        Ok(screen_buffer)
     }
     fn prepare_frame(&mut self, render: &mut Render) {
         if let Some(screen_buffer) = render.screen_buffer_mut() {
@@ -272,7 +271,13 @@ impl PlatformSDL {
     }
 }
 
-pub(crate) fn init(engine: &mut Engine, title: String, width: u32, height: u32) -> Result<()> {
+pub(crate) fn init<Setup: FnOnce(&mut Engine)>(
+    title: String,
+    width: u32,
+    height: u32,
+    vsync: bool,
+    setup: Setup,
+) -> Result<()> {
     let sdl_ctx = sdl2::init().map_err(|err| anyhow!(err))?;
     // SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER);
 
@@ -355,9 +360,12 @@ pub(crate) fn init(engine: &mut Engine, title: String, width: u32, height: u32) 
         wants_to_exit: false,
     };
     platform.find_gamepad();
-    platform
-        .video_init(&mut engine.render)
-        .map_err(|err| anyhow!(err))?;
+    let screen_buffer = platform.video_init(vsync).map_err(|err| anyhow!(err))?;
+
+    // Init engine
+    let mut engine = Engine::default();
+    engine.render.set_screen_buffer(screen_buffer);
+    setup(&mut engine);
 
     // Obtained samplerate might be different from requested
     // platform_output_samplerate = obtained_spec.freq;
@@ -365,7 +373,9 @@ pub(crate) fn init(engine: &mut Engine, title: String, width: u32, height: u32) 
     engine.render.resize(platform.window.drawable_size().into());
 
     while !platform.wants_to_exit {
-        platform.pump_events(engine).map_err(|err| anyhow!(err))?;
+        platform
+            .pump_events(&mut engine)
+            .map_err(|err| anyhow!(err))?;
         platform.prepare_frame(&mut engine.render);
         engine.update();
         platform.end_frame(&mut engine.render);

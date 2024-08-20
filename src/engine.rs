@@ -1,6 +1,7 @@
 use std::{
     any::{type_name, Any},
     path::Path,
+    rc::Rc,
     time::Instant,
 };
 
@@ -147,8 +148,17 @@ impl Engine {
 
     /// Registry a new entity type
     /// this function must be called before add entity
-    pub fn add_entity_type<T: EntityType + Default + Clone + 'static>(&mut self) {
-        self.world.add_entity_type::<T>()
+    pub fn add_entity_type<T: EntityType + Clone + 'static>(&mut self) {
+        let type_id = EntityTypeId::of::<T>();
+        let ent_type: Rc<dyn EntityType> = Rc::new(T::load(self));
+        self.world.entity_types.insert(type_id.clone(), ent_type);
+        let name = type_name::<T>()
+            .split("::")
+            .last()
+            .expect("can't get name of entity type");
+        self.world
+            .name_to_entity_types
+            .insert(name.to_string(), type_id);
     }
 
     /// Spawn a new entity
