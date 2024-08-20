@@ -5,10 +5,11 @@ use std::{
     time::Instant,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use glam::Vec2;
 
 use crate::{
+    assets::AssetsManager,
     camera::Camera,
     collision_map::{CollisionMap, COLLISION_MAP},
     commands::{Command, Commands},
@@ -110,6 +111,8 @@ pub struct Engine {
     pub(crate) input: InputState,
     // commands
     pub(crate) commands: Commands,
+    // AssetsManager
+    pub assets: AssetsManager,
 
     // time
     start_time: Instant,
@@ -143,6 +146,7 @@ impl Engine {
             input: InputState::default(),
             commands: Commands::default(),
             sweep_axis: SweepAxis::default(),
+            assets: AssetsManager::new("assets"),
         }
     }
 
@@ -207,7 +211,8 @@ impl Engine {
 
     /// Load image from path
     pub fn load_image<P: AsRef<Path>>(&self, path: P) -> Result<Image> {
-        self.render.load_image(path)
+        let full_path = self.assets.get_full_path(path);
+        self.render.load_image(full_path)
     }
 
     /// Create text
@@ -539,7 +544,16 @@ impl Engine {
                     self.collision_map.replace(map);
                 }
                 LayerType::AutoLayer | LayerType::Tiles => {
-                    let map = Map::from_ldtk_layer(proj, level, index, layer, &mut self.render)?;
+                    let tileset = if let Some(rel_path) = layer.tileset_rel_path.as_ref() {
+                        self.load_image(rel_path)?
+                    } else {
+                        bail!(
+                            "Layer {}-{} doesn't has tileset",
+                            level.identifier,
+                            &layer.identifier
+                        )
+                    };
+                    let map = Map::from_ldtk_layer(proj, level, index, layer, tileset)?;
                     self.background_maps.push(map);
                 }
                 LayerType::Entities => {

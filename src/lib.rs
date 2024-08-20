@@ -1,5 +1,6 @@
 pub mod animation;
 pub mod app;
+pub mod assets;
 pub mod camera;
 pub mod collision_map;
 pub mod color;

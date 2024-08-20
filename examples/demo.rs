@@ -12,7 +12,7 @@ const WALL_THICK: f32 = 200.0;
 const SPRITE_SIZE: f32 = 8.0;
 const BRICK_SIZE: Vec2 = Vec2::new(64., 32.);
 const BRICK_DYING: f32 = 0.3;
-const TEXTURE_PATH: &str = "examples/demo.png";
+const TEXTURE_PATH: &str = "demo.png";
 
 thread_local! {
     static G: RefCell<Game> = RefCell::new(Game::default());

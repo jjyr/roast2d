@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use glam::{UVec2, Vec2};
 
 use crate::{
@@ -52,14 +52,8 @@ impl Map {
         level: &LdtkLevel,
         layer_index: usize,
         layer: &LdtkLevelLayerInstance,
-        render: &mut Render,
+        mut tileset: Image,
     ) -> Result<Self> {
-        let mut tileset;
-        if let Some(path) = layer.tileset_rel_path.as_ref() {
-            tileset = render.load_image(path)?;
-        } else {
-            bail!("No tileset");
-        };
         if let Some(tileset_def) = layer
             .tileset_def_uid
             .and_then(|uid| project.get_tileset(uid))
