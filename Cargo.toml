@@ -9,6 +9,8 @@ description = "Roast2D is a homebrew 2D game engine inspired by high_impact"
 
 [features]
 debug_mut = []
+sdl2-static-link = ["sdl2/static-link"]
+sdl2-bundled = ["sdl2/bundled"]
 
 [dependencies]
 anyhow = "1.0.86"
