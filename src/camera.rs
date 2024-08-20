@@ -52,8 +52,12 @@ impl Camera {
         let screen_center = screen_size * 0.5;
         let mut viewport_target = self.pos - screen_center + self.offset;
         if let Some(bounds) = bounds {
-            viewport_target.x = viewport_target.x.clamp(0.0, bounds.x - screen_size.x);
-            viewport_target.y = viewport_target.y.clamp(0.0, bounds.y - screen_size.y);
+            viewport_target.x = viewport_target
+                .x
+                .clamp(0.0, (bounds.x - screen_size.x).max(0.0));
+            viewport_target.y = viewport_target
+                .y
+                .clamp(0.0, (bounds.y - screen_size.y).max(0.0));
         }
         viewport_target
     }
