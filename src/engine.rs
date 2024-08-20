@@ -248,16 +248,6 @@ impl Engine {
         self.render.set_view_size(size)
     }
 
-    /// VSync
-    pub fn vsync(&self) -> bool {
-        self.render.vsync
-    }
-
-    /// Set view size
-    pub fn set_vsync(&mut self, vsync: bool) {
-        self.render.vsync = vsync;
-    }
-
     /// Resize mode
     pub fn resize_mode(&self) -> ResizeMode {
         self.render.resize_mode()

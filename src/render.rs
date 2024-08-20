@@ -32,7 +32,6 @@ pub(crate) struct Render {
     scale_mode: ScaleMode,
     resize_mode: ResizeMode,
     view_size: Vec2,
-    pub(crate) vsync: bool,
 }
 
 impl Default for Render {
@@ -48,7 +47,6 @@ impl Default for Render {
             scale_mode: ScaleMode::default(),
             view_size: Vec2::new(1280.0, 720.0),
             resize_mode: ResizeMode::default(),
-            vsync: true,
         }
     }
 }
