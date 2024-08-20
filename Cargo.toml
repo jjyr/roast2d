@@ -1,6 +1,6 @@
 [package]
 name = "roast-2d"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 authors = ["jjy"]
 license = "MIT"
