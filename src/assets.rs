@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 
-/// Copy from bevy https://github.com/bevyengine/bevy/blob/99ab0285e459753838d0e0716fda9be7b4976a4c/crates/bevy_asset/src/io/file/mod.rs#L18
+/// Copy from bevy <https://github.com/bevyengine/bevy/blob/99ab0285e459753838d0e0716fda9be7b4976a4c/crates/bevy_asset/src/io/file/mod.rs#L18>
 pub(crate) fn get_base_path() -> PathBuf {
     if let Ok(manifest_dir) = env::var("ROAST2D_ASSET_ROOT") {
         PathBuf::from(manifest_dir)
