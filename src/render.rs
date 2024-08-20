@@ -139,16 +139,18 @@ impl Render {
 
     pub(crate) fn load_image<P: AsRef<Path>>(&self, path: P) -> Result<Image> {
         let im = image::open(path)?;
-        let surface = Surface::new(im.width(), im.height(), PixelFormatEnum::ABGR8888)
+        let width = im.width();
+        let height = im.height();
+        let mut data = im.into_bytes();
+        let pitch = width * 4;
+        let surface = Surface::from_data(&mut data, width, height, pitch, PixelFormatEnum::RGBA32)
             .map_err(|err| anyhow!(err))?;
-        let pitch = surface.pitch();
-        let mut texture = self
+        let texture = self
             .screen_buffer
             .as_ref()
             .ok_or_else(|| anyhow!("screen buffer"))?
             .texture_creator
             .create_texture_from_surface(surface)?;
-        texture.update(None, im.as_bytes(), pitch as usize)?;
         Ok(Image::new(texture))
     }
 
@@ -159,18 +161,25 @@ impl Render {
             scale,
             color,
         } = text;
-        let buffer = font.render_text_texture(&text, scale, color);
-        let surface = Surface::new(buffer.width(), buffer.height(), PixelFormatEnum::ABGR8888)
-            .map_err(|err| anyhow!(err))?;
-        let pitch = surface.pitch();
+        let mut buffer = font.render_text_texture(&text, scale, color);
+        let width = buffer.width();
+        let height = buffer.height();
+        let pitch = width * 4;
+        let surface = Surface::from_data(
+            buffer.as_mut(),
+            width,
+            height,
+            pitch,
+            PixelFormatEnum::RGBA32,
+        )
+        .map_err(|err| anyhow!(err))?;
         let screen_buffer = self
             .screen_buffer
             .as_ref()
             .ok_or_else(|| anyhow!("screen buffer"))?;
-        let mut texture = screen_buffer
+        let texture = screen_buffer
             .texture_creator
             .create_texture_from_surface(surface)?;
-        texture.update(None, buffer.as_ref(), pitch as usize)?;
         let mut image = Image::new(texture);
         image.color = color;
         Ok(image)
