@@ -22,6 +22,7 @@ use crate::{
     input::InputState,
     ldtk::{LayerType, LdtkProject},
     map::{map_draw, Map},
+    platform::Platform,
     render::{Render, ResizeMode, ScaleMode},
     sorts::insertion_sort_by_key,
     trace::Trace,
@@ -118,14 +119,8 @@ pub struct Engine {
     start_time: Instant,
 }
 
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Engine {
-    pub fn new() -> Self {
+    pub fn new(platform: Box<dyn Platform + 'static>) -> Self {
         Self {
             time_real: 0.0,
             time: 0.0,
@@ -141,7 +136,7 @@ impl Engine {
             scene: None,
             scene_next: None,
             world: Default::default(),
-            render: Render::default(),
+            render: Render::new(platform),
             start_time: Instant::now(),
             input: InputState::default(),
             commands: Commands::default(),
@@ -180,6 +175,10 @@ impl Engine {
         }
     }
 
+    pub(crate) fn platform_mut(&mut self) -> &mut dyn Platform {
+        self.render.platform.as_mut()
+    }
+
     pub fn spawn_with_type_name(&mut self, name: String, pos: Vec2) -> EntityRef {
         match self
             .world
@@ -210,27 +209,33 @@ impl Engine {
     }
 
     /// Load image from path
-    pub fn load_image<P: AsRef<Path>>(&self, path: P) -> Result<Image> {
+    pub fn load_image<P: AsRef<Path>>(&mut self, path: P) -> Result<Image> {
         let full_path = self.assets.get_full_path(path);
         self.render.load_image(full_path)
     }
 
     /// Create text
-    pub fn create_text_texture(&self, text: Text) -> Result<Image> {
+    pub fn create_text_texture(&mut self, text: Text) -> Result<Image> {
         self.render.create_text_texture(text)
     }
 
     /// Draw image
     pub fn draw_image(&mut self, image: &Image, pos: Vec2) {
-        let size = image.size();
-        image.draw_tile_ex(
-            &mut self.render,
-            0,
-            Vec2::new(size.x as f32, size.y as f32),
-            pos,
-            false,
-            false,
-        );
+        self.render.draw_image(image, pos);
+    }
+
+    /// Draw image as tile
+    pub fn draw_tile(
+        &mut self,
+        image: &Image,
+        tile: u16,
+        tile_size: Vec2,
+        dst_pos: Vec2,
+        flip_x: bool,
+        flip_y: bool,
+    ) {
+        self.render
+            .draw_tile(image, tile, tile_size, dst_pos, flip_x, flip_y);
     }
 
     /// Sweep axis
@@ -317,7 +322,7 @@ impl Engine {
 
     /// Scene base draw, draw maps and entities
     pub fn scene_base_draw(&mut self) {
-        let px_viewport = self.render.render_snap_px(self.camera.viewport);
+        let px_viewport = self.render.snap_px(self.camera.viewport);
 
         // Background maps
         for map in self.background_maps.iter().rev() {

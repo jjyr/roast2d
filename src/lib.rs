@@ -8,6 +8,7 @@ pub mod commands;
 pub mod engine;
 pub mod entity;
 pub mod font;
+pub mod handle;
 pub mod image;
 pub mod input;
 pub mod ldtk;
