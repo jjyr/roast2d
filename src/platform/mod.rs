@@ -3,8 +3,15 @@ use glam::{UVec2, Vec2};
 
 use crate::{color::Color, engine::Engine, handle::Handle};
 
-pub type DefaultPlatform = sdl::PlatformSDL;
-mod sdl;
+cfg_if::cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        pub type DefaultPlatform = web::WebPlatform;
+        mod web;
+    } else {
+        pub type DefaultPlatform = sdl::SDLPlatform;
+        mod sdl;
+    }
+}
 
 pub trait Platform {
     fn prepare_frame(&mut self);

@@ -56,7 +56,7 @@ impl ScreenBuffer {
     }
 }
 
-pub struct PlatformSDL {
+pub struct SDLPlatform {
     screen_buffer: ScreenBuffer,
     textures: HashMap<u64, Texture>,
     handle_id: u64,
@@ -64,7 +64,7 @@ pub struct PlatformSDL {
     sender: Sender<DropEvent>,
 }
 
-impl PlatformSDL {
+impl SDLPlatform {
     fn new(screen_buffer: ScreenBuffer) -> Self {
         let (sender, receiver) = channel();
         Self {
@@ -84,7 +84,7 @@ impl PlatformSDL {
     }
 }
 
-impl Platform for PlatformSDL {
+impl Platform for SDLPlatform {
     fn prepare_frame(&mut self) {
         self.screen_buffer.clear();
     }
@@ -125,7 +125,7 @@ impl Platform for PlatformSDL {
         );
 
         let Some(texture) = self.textures.get_mut(&handle.id()) else {
-            eprintln!("Failed to get texture {}", handle.id());
+            log::error!("Failed to get texture {}", handle.id());
             return;
         };
 
@@ -199,7 +199,7 @@ impl Platform for PlatformSDL {
 
         // Init engine
         let mut engine = {
-            let platform = PlatformSDL::new(screen_buffer);
+            let platform = SDLPlatform::new(screen_buffer);
             Engine::new(Box::new(platform))
         };
         setup(&mut engine);
@@ -291,7 +291,7 @@ impl SDLEventHandler {
                             self.gamepad = Some(gamepad);
                         }
                         Err(err) => {
-                            eprintln!("SDL open controller {err:?}");
+                            log::error!("SDL open controller {err:?}");
                         }
                     }
                 }
@@ -391,7 +391,7 @@ impl SDLEventHandler {
         let num = match self.controller_subsystem.num_joysticks() {
             Ok(num) => num,
             Err(err) => {
-                eprintln!("SDL joysticks error {err}");
+                log::error!("SDL joysticks error {err}");
                 return;
             }
         };
@@ -402,14 +402,14 @@ impl SDLEventHandler {
                         self.gamepad = Some(gamepad);
                     }
                     Err(err) => {
-                        eprintln!("SDL Open controller {err}");
+                        log::error!("SDL Open controller {err}");
                     }
                 }
                 break;
             }
         }
         if self.gamepad.is_none() {
-            eprintln!("No game controller");
+            log::error!("No game controller");
         }
     }
 }

@@ -575,7 +575,7 @@ impl Engine {
                     }
                 }
                 _ => {
-                    eprintln!("Ignore layer {} {:?}", layer.identifier, layer.r#type);
+                    log::error!("Ignore layer {} {:?}", layer.identifier, layer.r#type);
                 }
             }
         }
