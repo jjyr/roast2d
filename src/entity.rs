@@ -22,7 +22,7 @@ macro_rules! with_ent {
             $f(&mut instance);
             $ent.instance.replace(instance);
         } else {
-            eprintln!("Can't get entity instance {:?}", $ent.ent_ref)
+            log::error!("Can't get entity instance {:?}", $ent.ent_ref)
         }
     };
 }
