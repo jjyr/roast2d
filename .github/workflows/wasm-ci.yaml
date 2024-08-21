@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: --deny warnings
+  RUSTDOCFLAGS: --deny warnings
+
+jobs:
+  # Run tests.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: sudo apt-get update; sudo apt-get install --no-install-recommends libsdl2-dev libasound2-dev
+
+      - name: Add target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Populate target directory from cache
+        uses: Leafwing-Studios/cargo-cache@v2
+
+      - name: Run check
+        run: |
+          cargo check --target wasm32-unknown-unknown
