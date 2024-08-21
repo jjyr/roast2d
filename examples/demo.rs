@@ -324,7 +324,7 @@ impl Scene for Demo {
         if let Ok(font) = Font::open(font_path) {
             self.font.replace(font);
         } else {
-            eprintln!("Failed to load font from {font_path}");
+            log::error!("Failed to load font from {font_path}");
         }
 
         eng.spawn::<Player>(Vec2::new(40.0, view.y - 32.0));
@@ -350,7 +350,7 @@ impl Scene for Demo {
             }
         }
 
-        eprintln!("Init Demo");
+        log::error!("Init Demo");
     }
 
     fn update(&mut self, eng: &mut Engine) {

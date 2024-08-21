@@ -357,7 +357,7 @@ pub struct InputState {
 impl InputState {
     pub(crate) fn set_input_state(&mut self, key: KeyCode, state: KeyState) {
         if key == KeyCode::Invalid {
-            eprintln!("Invalid input button");
+            log::error!("Invalid input button");
             return;
         }
 
@@ -399,7 +399,7 @@ impl InputState {
     /// Bind a keycode to an action
     pub fn bind<Action: Into<ActionId>>(&mut self, code: KeyCode, action: Action) {
         if code == KeyCode::Invalid {
-            eprintln!("bind: Invalid key code");
+            log::error!("bind: Invalid key code");
             return;
         }
         let id = action.into();
@@ -459,6 +459,6 @@ impl InputState {
     }
 
     pub fn text_input(&self, _text: String) {
-        // eprintln!("Input receive text: {text}")
+        // log::error!("Input receive text: {text}")
     }
 }

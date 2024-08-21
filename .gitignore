@@ -6,3 +6,7 @@
 
 # MacOS
 .DS_STORE
+
+# WASM build files
+/www
+/pkg
