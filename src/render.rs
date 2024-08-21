@@ -1,10 +1,9 @@
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use glam::{UVec2, Vec2};
-use sdl2::{pixels::PixelFormatEnum, rect::Rect, render::Texture, surface::Surface};
 
-use crate::{font::Text, image::Image, platform::ScreenBuffer};
+use crate::{color::Color, font::Text, handle::Handle, image::Image, platform::Platform};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub enum ScaleMode {
@@ -27,49 +26,38 @@ pub(crate) struct Render {
     inv_screen_scale: f32,
     pub(crate) screen_size: Vec2,
     logical_size: Vec2,
-    // transform_stack: Vec<Mat3>,
-    screen_buffer: Option<ScreenBuffer>,
     scale_mode: ScaleMode,
     resize_mode: ResizeMode,
     view_size: Vec2,
+    pub(crate) platform: Box<dyn Platform + 'static>,
 }
 
-impl Default for Render {
-    fn default() -> Self {
+impl Render {
+    pub(crate) fn new(platform: Box<dyn Platform + 'static>) -> Self {
         Self {
             draw_calls: 0,
             screen_scale: 1.0,
             inv_screen_scale: 1.0,
             screen_size: Vec2::default(),
             logical_size: Vec2::default(),
-            // transform_stack: Default::default(),
-            screen_buffer: None,
             scale_mode: ScaleMode::default(),
             view_size: Vec2::new(1280.0, 720.0),
             resize_mode: ResizeMode::default(),
+            platform,
         }
     }
-}
 
-impl Render {
-    pub(crate) fn set_screen_buffer(&mut self, screen_buffer: ScreenBuffer) {
-        self.screen_buffer.replace(screen_buffer);
-    }
-
-    pub(crate) fn screen_buffer_mut(&mut self) -> Option<&mut ScreenBuffer> {
-        self.screen_buffer.as_mut()
-    }
-
-    pub(crate) fn render_snap_px(&self, pos: Vec2) -> Vec2 {
+    pub(crate) fn snap_px(&self, pos: Vec2) -> Vec2 {
         let sp = pos * self.screen_scale;
         sp * self.inv_screen_scale
     }
 
-    pub(crate) fn render_draw(
+    pub(crate) fn draw(
         &mut self,
+        handle: &Handle,
+        color: Color,
         mut pos: Vec2,
         mut size: Vec2,
-        texture: &Texture,
         uv_offset: Vec2,
         uv_size: Vec2,
         flip_x: bool,
@@ -86,26 +74,59 @@ impl Render {
         pos *= self.screen_scale;
         size *= self.screen_scale;
         self.draw_calls += 1;
-        if let Some(screen_buffer) = self.screen_buffer.as_mut() {
-            let src = Rect::new(
-                uv_offset.x.round() as i32,
-                uv_offset.y.round() as i32,
-                uv_size.x.round() as u32,
-                uv_size.y.round() as u32,
-            );
-            let dst = Rect::new(
-                pos.x.round() as i32,
-                pos.y.round() as i32,
-                size.x.round() as u32,
-                size.y.round() as u32,
-            );
-            if let Err(err) = screen_buffer
-                .canvas
-                .copy_ex(texture, src, dst, 0.0, None, flip_x, flip_y)
-            {
-                eprintln!("SDL render_draw {err}");
-            }
-        }
+
+        self.platform.draw(
+            handle, color, pos, size, uv_offset, uv_size, 0.0, flip_x, flip_y,
+        );
+    }
+
+    /// Draw image
+    pub fn draw_image(&mut self, image: &Image, pos: Vec2) {
+        let size = image.size();
+        self.draw_tile(
+            image,
+            0,
+            Vec2::new(size.x as f32, size.y as f32),
+            pos,
+            false,
+            false,
+        );
+    }
+
+    /// Draw image as tile
+    pub fn draw_tile(
+        &mut self,
+        image: &Image,
+        tile: u16,
+        tile_size: Vec2,
+        dst_pos: Vec2,
+        flip_x: bool,
+        flip_y: bool,
+    ) {
+        let cols = ((image.size().x as f32 - image.padding) / (tile_size.x + image.spacing)).round()
+            as u32;
+        let row = tile as u32 / cols;
+        let col = tile as u32 % cols;
+        let src_pos = Vec2::new(
+            col as f32 * (tile_size.x + image.spacing) + image.padding,
+            row as f32 * (tile_size.y + image.spacing) + image.padding,
+        );
+        let src_size = Vec2::new(tile_size.x, tile_size.y);
+        let dst_size = src_size * image.scale;
+
+        // color
+        let flip_x = flip_x || image.flip_x;
+        let flip_y = flip_y || image.flip_y;
+        self.draw(
+            &image.texture,
+            image.color,
+            dst_pos,
+            dst_size,
+            src_pos,
+            src_size,
+            flip_x,
+            flip_y,
+        );
     }
 
     pub(crate) fn resize(&mut self, size: UVec2) {
@@ -137,50 +158,30 @@ impl Render {
         self.inv_screen_scale = 1.0 / self.screen_scale;
     }
 
-    pub(crate) fn load_image<P: AsRef<Path>>(&self, path: P) -> Result<Image> {
+    pub(crate) fn load_image<P: AsRef<Path>>(&mut self, path: P) -> Result<Image> {
         let im = image::open(path)?;
         let width = im.width();
         let height = im.height();
-        let mut data = im.into_bytes();
-        let pitch = width * 4;
-        let surface = Surface::from_data(&mut data, width, height, pitch, PixelFormatEnum::RGBA32)
-            .map_err(|err| anyhow!(err))?;
         let texture = self
-            .screen_buffer
-            .as_ref()
-            .ok_or_else(|| anyhow!("screen buffer"))?
-            .texture_creator
-            .create_texture_from_surface(surface)?;
-        Ok(Image::new(texture))
+            .platform
+            .create_texture(im.into_bytes(), UVec2::new(width, height));
+        Ok(Image::new(texture, UVec2::new(width, height)))
     }
 
-    pub(crate) fn create_text_texture(&self, text: Text) -> Result<Image> {
+    pub(crate) fn create_text_texture(&mut self, text: Text) -> Result<Image> {
         let Text {
             text,
             font,
             scale,
             color,
         } = text;
-        let mut buffer = font.render_text_texture(&text, scale, color);
+        let buffer = font.render_text_texture(&text, scale, color);
         let width = buffer.width();
         let height = buffer.height();
-        let pitch = width * 4;
-        let surface = Surface::from_data(
-            buffer.as_mut(),
-            width,
-            height,
-            pitch,
-            PixelFormatEnum::RGBA32,
-        )
-        .map_err(|err| anyhow!(err))?;
-        let screen_buffer = self
-            .screen_buffer
-            .as_ref()
-            .ok_or_else(|| anyhow!("screen buffer"))?;
-        let texture = screen_buffer
-            .texture_creator
-            .create_texture_from_surface(surface)?;
-        let mut image = Image::new(texture);
+        let size = UVec2::new(width, height);
+
+        let texture = self.platform.create_texture(buffer.into_vec(), size);
+        let mut image = Image::new(texture, size);
         image.color = color;
         Ok(image)
     }

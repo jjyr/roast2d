@@ -1,11 +1,18 @@
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Receiver, Sender},
+};
+
 use anyhow::{anyhow, Result};
-use glam::Vec2;
+use glam::{UVec2, Vec2};
 use sdl2::{
     controller::{Axis, Button, GameController},
     event::{Event, WindowEvent},
     keyboard::{Mod, Scancode},
     mouse::MouseButton,
-    render::{Canvas, TextureCreator},
+    pixels::PixelFormatEnum,
+    render::{Canvas, Texture, TextureCreator},
+    surface::Surface,
     video::{FullscreenType, Window, WindowContext},
     GameControllerSubsystem, Sdl,
 };
@@ -13,9 +20,11 @@ use sdl2::{
 use crate::{
     color::Color,
     engine::Engine,
+    handle::{DropEvent, Handle},
     input::{KeyCode, KeyState},
-    render::Render,
 };
+
+use super::Platform;
 
 impl From<Color> for sdl2::pixels::Color {
     fn from(value: Color) -> Self {
@@ -24,7 +33,7 @@ impl From<Color> for sdl2::pixels::Color {
     }
 }
 
-pub(crate) struct ScreenBuffer {
+struct ScreenBuffer {
     pub(crate) texture_creator: TextureCreator<WindowContext>,
     pub(crate) canvas: Canvas<Window>,
 }
@@ -47,7 +56,178 @@ impl ScreenBuffer {
     }
 }
 
-struct PlatformSDL {
+pub struct PlatformSDL {
+    screen_buffer: ScreenBuffer,
+    textures: HashMap<u64, Texture>,
+    handle_id: u64,
+    receiver: Receiver<DropEvent>,
+    sender: Sender<DropEvent>,
+}
+
+impl PlatformSDL {
+    fn new(screen_buffer: ScreenBuffer) -> Self {
+        let (sender, receiver) = channel();
+        Self {
+            screen_buffer,
+            textures: Default::default(),
+            handle_id: 0,
+            sender,
+            receiver,
+        }
+    }
+
+    fn alloc_handle(&mut self) -> Handle {
+        let id = self.handle_id;
+        self.handle_id += 1;
+        let drop_sender = self.sender.clone();
+        Handle::new(id, drop_sender)
+    }
+}
+
+impl Platform for PlatformSDL {
+    fn prepare_frame(&mut self) {
+        self.screen_buffer.clear();
+    }
+
+    fn end_frame(&mut self) {
+        self.screen_buffer.present();
+
+        while let Ok(event) = self.receiver.try_recv() {
+            self.textures.remove(&event.0);
+        }
+    }
+
+    fn cleanup(&mut self) {}
+
+    fn draw(
+        &mut self,
+        handle: &Handle,
+        color: Color,
+        pos: Vec2,
+        size: Vec2,
+        uv_offset: Vec2,
+        uv_size: Vec2,
+        angle: f32,
+        flip_x: bool,
+        flip_y: bool,
+    ) {
+        let src = sdl2::rect::Rect::new(
+            uv_offset.x.round() as i32,
+            uv_offset.y.round() as i32,
+            uv_size.x.round() as u32,
+            uv_size.y.round() as u32,
+        );
+        let dst = sdl2::rect::Rect::new(
+            pos.x.round() as i32,
+            pos.y.round() as i32,
+            size.x.round() as u32,
+            size.y.round() as u32,
+        );
+
+        let Some(texture) = self.textures.get_mut(&handle.id()) else {
+            eprintln!("Failed to get texture {}", handle.id());
+            return;
+        };
+
+        texture.set_color_mod(color.r, color.g, color.b);
+
+        self.screen_buffer
+            .canvas
+            .copy_ex(texture, src, dst, angle.into(), None, flip_x, flip_y)
+            .unwrap();
+    }
+
+    fn create_texture(&mut self, mut data: Vec<u8>, size: UVec2) -> Handle {
+        let UVec2 {
+            x: width,
+            y: height,
+        } = size;
+        let pitch = width * 4;
+        let surface = Surface::from_data(&mut data, width, height, pitch, PixelFormatEnum::RGBA32)
+            .map_err(|err| anyhow!(err))
+            .unwrap();
+
+        let texture = self
+            .screen_buffer
+            .texture_creator
+            .create_texture_from_surface(surface)
+            .unwrap();
+
+        let handle = self.alloc_handle();
+        self.textures.insert(handle.id(), texture);
+
+        handle
+    }
+
+    fn run<Setup: FnOnce(&mut Engine)>(
+        title: String,
+        width: u32,
+        height: u32,
+        vsync: bool,
+        setup: Setup,
+    ) -> Result<()> {
+        let sdl_ctx = sdl2::init().map_err(|err| anyhow!(err))?;
+
+        let controller_subsystem = sdl_ctx.game_controller().map_err(|err| anyhow!(err))?;
+        let video_subsystem = sdl_ctx.video().map_err(|err| anyhow!(err))?;
+        let window = video_subsystem
+            .window(&title, width, height)
+            .position_centered()
+            .opengl()
+            .resizable()
+            .allow_highdpi()
+            .build()
+            .map_err(|err| anyhow!(err))?;
+        let screen_buffer = {
+            let mut builder = window.clone().into_canvas();
+            if vsync {
+                builder = builder.present_vsync();
+            }
+            let canvas = builder.build().map_err(|e| anyhow!(e))?;
+            ScreenBuffer::new(canvas)
+        };
+
+        let mut event_handler = SDLEventHandler {
+            sdl: sdl_ctx.clone(),
+            window: window.clone(),
+            controller_subsystem,
+            gamepad: None,
+            wants_to_exit: false,
+        };
+
+        event_handler.find_gamepad();
+
+        // Init engine
+        let mut engine = {
+            let platform = PlatformSDL::new(screen_buffer);
+            Engine::new(Box::new(platform))
+        };
+        setup(&mut engine);
+
+        // Obtained samplerate might be different from requested
+        // platform_output_samplerate = obtained_spec.freq;
+        engine.init();
+        engine
+            .render
+            .resize(event_handler.window.drawable_size().into());
+
+        while !event_handler.wants_to_exit {
+            event_handler
+                .pump_events(&mut engine)
+                .map_err(|err| anyhow!(err))?;
+            engine.platform_mut().prepare_frame();
+            engine.update();
+            engine.platform_mut().end_frame();
+        }
+
+        engine.cleanup();
+        engine.platform_mut().cleanup();
+
+        Ok(())
+    }
+}
+
+struct SDLEventHandler {
     sdl: Sdl,
     window: Window,
     // video_subsystem: VideoSubsystem,
@@ -56,30 +236,7 @@ struct PlatformSDL {
     wants_to_exit: bool,
 }
 
-impl PlatformSDL {
-    fn video_init(&mut self, vsync: bool) -> Result<ScreenBuffer> {
-        let mut builder = self.window.clone().into_canvas();
-        if vsync {
-            builder = builder.present_vsync();
-        }
-        let canvas = builder.build().map_err(|e| anyhow!(e))?;
-        let screen_buffer = ScreenBuffer::new(canvas);
-        Ok(screen_buffer)
-    }
-    fn prepare_frame(&mut self, render: &mut Render) {
-        if let Some(screen_buffer) = render.screen_buffer_mut() {
-            screen_buffer.clear();
-        }
-    }
-    fn end_frame(&mut self, render: &mut Render) {
-        if let Some(screen_buffer) = render.screen_buffer_mut() {
-            screen_buffer.present();
-        }
-    }
-    fn video_cleanup(&mut self, render: &mut Render) {
-        render.screen_buffer_mut().take();
-    }
-
+impl SDLEventHandler {
     fn pump_events(&mut self, engine: &mut Engine) -> Result<()> {
         let mut event_pump = self.sdl.event_pump().map_err(|err| anyhow!(err))?;
         for event in event_pump.poll_iter() {
@@ -226,20 +383,6 @@ impl PlatformSDL {
                 }
                 _ => {}
             }
-
-            // // Window Events
-            // if (ev.type == SDL_QUIT) {
-            // 	wants_to_exit = true;
-            // }
-            // else if (
-            // 	ev.type == SDL_WINDOWEVENT &&
-            // 	(
-            // 		ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
-            // 		ev.window.event == SDL_WINDOWEVENT_RESIZED
-            // 	)
-            // ) {
-            // 	engine_resize(platform_screen_size());
-            // }
         }
         Ok(())
     }
@@ -269,134 +412,6 @@ impl PlatformSDL {
             eprintln!("No game controller");
         }
     }
-}
-
-pub(crate) fn init<Setup: FnOnce(&mut Engine)>(
-    title: String,
-    width: u32,
-    height: u32,
-    vsync: bool,
-    setup: Setup,
-) -> Result<()> {
-    let sdl_ctx = sdl2::init().map_err(|err| anyhow!(err))?;
-    // SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER);
-
-    // Figure out the absolute asset and userdata paths. These may either be
-    // supplied at build time through -DPATH_ASSETS=.. and -DPATH_USERDATA=..
-    // or received at runtime from SDL. Note that SDL may return NULL for these.
-    // We fall back to the current directory (i.e. just "") in this case.
-
-    // char *sdl_path_assets = NULL;
-    // #ifdef PATH_ASSETS
-    // 	path_assets = TOSTRING(PATH_ASSETS);
-    // #else
-    // 	sdl_path_assets = SDL_GetBasePath();
-    // 	if (sdl_path_assets) {
-    // 		path_assets = sdl_path_assets;
-    // 	}
-    // #endif
-
-    // char *sdl_path_userdata = NULL;
-    // #ifdef PATH_USERDATA
-    // 	path_userdata = TOSTRING(PATH_USERDATA);
-    // #else
-    // 	sdl_path_userdata = SDL_GetPrefPath(GAME_VENDOR, GAME_NAME);
-    // 	if (sdl_path_userdata) {
-    // 		path_userdata = sdl_path_userdata;
-    // 	}
-    // #endif
-
-    // Reserve some space for concatenating the asset and userdata paths with
-    // local filenames.
-    // temp_path = bump_alloc(max(strlen(path_assets), strlen(path_userdata)) + 64);
-
-    // Load gamecontrollerdb.txt if present.
-    // FIXME: Should this load from userdata instead?
-    // char *gcdb_path = strcat(strcpy(temp_path, path_assets), "gamecontrollerdb.txt");
-    // int gcdb_res = SDL_GameControllerAddMappingsFromFile(gcdb_path);
-    // if (gcdb_res < 0) {
-    // 	printf("Failed to load gamecontrollerdb.txt\n");
-    // }
-    // else {
-    // 	printf("load gamecontrollerdb.txt\n");
-    // }
-
-    let controller_subsystem = sdl_ctx.game_controller().map_err(|err| anyhow!(err))?;
-    // perf_freq = SDL_GetPerformanceFrequency();
-
-    // SDL_AudioSpec obtained_spec;
-    // audio_device = SDL_OpenAudioDevice(NULL, 0, &(SDL_AudioSpec){
-    // 	.freq = platform_output_samplerate,
-    // 	.format = AUDIO_F32SYS,
-    // 	.channels = 2,
-    // 	.samples = 1024,
-    // 	.callback = platform_audio_callback
-    // }, &obtained_spec, 0);
-
-    let video_subsystem = sdl_ctx.video().map_err(|err| anyhow!(err))?;
-    let window = video_subsystem
-        .window(&title, width, height)
-        .position_centered()
-        .opengl()
-        .resizable()
-        .allow_highdpi()
-        .build()
-        .map_err(|err| anyhow!(err))?;
-    // window = SDL_CreateWindow(
-    //     WINDOW_TITLE,
-    //     SDL_WINDOWPOS_CENTERED,
-    //     SDL_WINDOWPOS_CENTERED,
-    //     WINDOW_WIDTH,
-    //     WINDOW_HEIGHT,
-    //     SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | PLATFORM_WINDOW_FLAGS | SDL_WINDOW_ALLOW_HIGHDPI,
-    // );
-
-    let mut platform = PlatformSDL {
-        sdl: sdl_ctx,
-        window,
-        // video_subsystem,
-        controller_subsystem,
-        gamepad: None,
-        wants_to_exit: false,
-    };
-    platform.find_gamepad();
-    let screen_buffer = platform.video_init(vsync).map_err(|err| anyhow!(err))?;
-
-    // Init engine
-    let mut engine = Engine::default();
-    engine.render.set_screen_buffer(screen_buffer);
-    setup(&mut engine);
-
-    // Obtained samplerate might be different from requested
-    // platform_output_samplerate = obtained_spec.freq;
-    engine.init();
-    engine.render.resize(platform.window.drawable_size().into());
-
-    while !platform.wants_to_exit {
-        platform
-            .pump_events(&mut engine)
-            .map_err(|err| anyhow!(err))?;
-        platform.prepare_frame(&mut engine.render);
-        engine.update();
-        platform.end_frame(&mut engine.render);
-    }
-
-    engine.cleanup();
-    platform.video_cleanup(&mut engine.render);
-
-    // SDL_DestroyWindow(window);
-
-    // close gamepad
-
-    // if (sdl_path_assets) {
-    //     SDL_free(sdl_path_assets);
-    // }
-    // if (sdl_path_userdata) {
-    //     SDL_free(sdl_path_userdata);
-    // }
-
-    // SDL_CloseAudioDevice(audio_device);
-    Ok(())
 }
 
 impl From<Button> for KeyCode {

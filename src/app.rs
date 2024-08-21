@@ -1,7 +1,10 @@
 use anyhow::Result;
 use glam::UVec2;
 
-use crate::{engine::Engine, platform};
+use crate::{
+    engine::Engine,
+    platform::{DefaultPlatform, Platform},
+};
 
 #[derive(Debug)]
 pub struct App {
@@ -46,6 +49,6 @@ impl App {
             },
             vsync,
         } = self;
-        platform::sdl::init(title, width, height, vsync, setup)
+        DefaultPlatform::run(title, width, height, vsync, setup)
     }
 }

@@ -113,8 +113,8 @@ impl Map {
 }
 
 fn map_draw_tile(render: &mut Render, map: &Map, tile: &Tile, pos: Vec2) {
-    map.tileset.draw_tile_ex(
-        render,
+    render.draw_tile(
+        &map.tileset,
         tile.tile_id,
         Vec2::splat(map.tile_size),
         pos,
