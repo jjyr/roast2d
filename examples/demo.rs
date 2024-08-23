@@ -2,7 +2,7 @@ extern crate roast_2d;
 use std::cell::{OnceCell, RefCell};
 
 use glam::UVec2;
-use roast_2d::prelude::*;
+use roast_2d::{handle::Handle, prelude::*};
 
 const BALL_ACCEL: f32 = 200.0;
 const BALL_MAX_VEL: f32 = 300.0;
@@ -16,12 +16,12 @@ const TEXTURE_PATH: &str = "demo.png";
 
 thread_local! {
     static G: RefCell<Game> = RefCell::new(Game::default());
-    static TEXTURE: OnceCell<Image> = const { OnceCell::new() } ;
+    static TEXTURE: OnceCell<Handle> = const { OnceCell::new() } ;
 }
 
-fn load_texture(eng: &mut Engine) -> Image {
+fn load_texture(eng: &mut Engine) -> Handle {
     TEXTURE.with(|t| {
-        t.get_or_init(|| eng.load_image(TEXTURE_PATH).unwrap())
+        t.get_or_init(|| eng.assets.load_texture(TEXTURE_PATH))
             .clone()
     })
 }
@@ -54,7 +54,7 @@ pub struct Ball {
 impl EntityType for Ball {
     fn load(eng: &mut Engine) -> Self {
         let size = Vec2::new(32., 32.0);
-        let mut sheet = load_texture(eng);
+        let mut sheet = Sprite::new(load_texture(eng), UVec2::splat(SPRITE_SIZE as u32));
         sheet.scale = size / SPRITE_SIZE;
         sheet.color = Color::rgb(0xfb, 0xf2, 0x36);
         let anim = Animation::new(sheet);
@@ -175,7 +175,7 @@ pub struct Brick {
 
 impl EntityType for Brick {
     fn load(eng: &mut Engine) -> Self {
-        let mut sheet = load_texture(eng);
+        let mut sheet = Sprite::new(load_texture(eng), UVec2::splat(SPRITE_SIZE as u32));
         sheet.scale = BRICK_SIZE / SPRITE_SIZE;
         sheet.color = Color::rgb(0x5b, 0x6e, 0xe1);
         let anim = Animation::new(sheet);
@@ -249,7 +249,7 @@ pub struct Player {
 
 impl EntityType for Player {
     fn load(eng: &mut Engine) -> Self {
-        let mut sheet = load_texture(eng);
+        let mut sheet = Sprite::new(load_texture(eng), UVec2::splat(SPRITE_SIZE as u32));
         let size = Vec2::new(128.0, 48.0);
         sheet.scale = size / SPRITE_SIZE;
         sheet.color = Color::rgb(0x37, 0x94, 0x6e);
@@ -291,8 +291,8 @@ pub struct Demo {
     timer: f32,
     interval: f32,
     font: Option<Font>,
-    score_text: Option<Image>,
-    fps_text: Option<Image>,
+    score_text: Option<Sprite>,
+    fps_text: Option<Sprite>,
 }
 
 impl Default for Demo {
@@ -350,7 +350,7 @@ impl Scene for Demo {
             }
         }
 
-        log::error!("Init Demo");
+        log::info!("Init Demo");
     }
 
     fn update(&mut self, eng: &mut Engine) {
@@ -365,14 +365,16 @@ impl Scene for Demo {
             if let Some(font) = self.font.clone() {
                 let content = format!("FPS: {:.2}", fps);
                 let text = Text::new(content, font, 30.0, WHITE);
-                self.fps_text = eng.create_text_texture(text).ok();
+                let (texture, size) = eng.create_text_texture(text);
+                self.fps_text = Some(Sprite::new(texture, size));
             }
         }
         if let Some(font) = self.font.clone() {
             let score = G.with_borrow(|g| g.score);
             let content = format!("Score: {}", score);
             let text = Text::new(content, font.clone(), 30.0, WHITE);
-            self.score_text = eng.create_text_texture(text).ok();
+            let (texture, size) = eng.create_text_texture(text);
+            self.score_text = Some(Sprite::new(texture, size));
         }
     }
 
@@ -388,28 +390,49 @@ impl Scene for Demo {
     }
 }
 
+fn setup(eng: &mut Engine) {
+    // set resize and scale
+    eng.set_view_size(Vec2::new(800.0, 600.0));
+    eng.set_scale_mode(ScaleMode::Exact);
+    eng.set_resize_mode(ResizeMode {
+        width: true,
+        height: true,
+    });
+    eng.set_sweep_axis(SweepAxis::Y);
+    eng.add_entity_type::<Player>();
+    eng.add_entity_type::<LeftWall>();
+    eng.add_entity_type::<RightWall>();
+    eng.add_entity_type::<TopWall>();
+    eng.add_entity_type::<BottomWall>();
+    eng.add_entity_type::<Ball>();
+    eng.add_entity_type::<Brick>();
+    eng.set_scene(Demo::default());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    env_logger::init();
     App::default()
         .title("Hello Roast2D".to_string())
         .window(UVec2::new(800, 600))
         .vsync(true)
-        .run(|eng: &mut Engine| {
-            // set resize and scale
-            eng.set_view_size(Vec2::new(800.0, 600.0));
-            eng.set_scale_mode(ScaleMode::Exact);
-            eng.set_resize_mode(ResizeMode {
-                width: true,
-                height: true,
-            });
-            eng.set_sweep_axis(SweepAxis::Y);
-            eng.add_entity_type::<Player>();
-            eng.add_entity_type::<LeftWall>();
-            eng.add_entity_type::<RightWall>();
-            eng.add_entity_type::<TopWall>();
-            eng.add_entity_type::<BottomWall>();
-            eng.add_entity_type::<Ball>();
-            eng.add_entity_type::<Brick>();
-            eng.set_scene(Demo::default());
-        })
+        .run_block(setup)
         .expect("Start game");
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub async fn run() {
+    App::default()
+        .title("Hello Roast2D".to_string())
+        .window(UVec2::new(800, 600))
+        .vsync(true)
+        .run(setup)
+        .await
+        .expect("Start game");
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    // See run function
 }

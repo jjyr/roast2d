@@ -3,6 +3,8 @@ use std::{
     sync::{mpsc::Sender, Arc},
 };
 
+pub type HandleId = u64;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Handle(pub(crate) Arc<StrongHandle>);
 
@@ -11,7 +13,7 @@ impl Handle {
         Self(Arc::new(StrongHandle { id, drop_sender }))
     }
 
-    pub(crate) fn id(&self) -> u64 {
+    pub(crate) fn id(&self) -> HandleId {
         self.0.id
     }
 }

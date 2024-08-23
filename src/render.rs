@@ -1,9 +1,6 @@
-use std::path::Path;
-
-use anyhow::Result;
 use glam::{UVec2, Vec2};
 
-use crate::{color::Color, font::Text, handle::Handle, image::Image, platform::Platform};
+use crate::{color::Color, font::Text, handle::Handle, platform::Platform, sprite::Sprite};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub enum ScaleMode {
@@ -81,7 +78,7 @@ impl Render {
     }
 
     /// Draw image
-    pub fn draw_image(&mut self, image: &Image, pos: Vec2) {
+    pub fn draw_image(&mut self, image: &Sprite, pos: Vec2) {
         let size = image.size();
         self.draw_tile(
             image,
@@ -96,7 +93,7 @@ impl Render {
     /// Draw image as tile
     pub fn draw_tile(
         &mut self,
-        image: &Image,
+        image: &Sprite,
         tile: u16,
         tile_size: Vec2,
         dst_pos: Vec2,
@@ -158,17 +155,7 @@ impl Render {
         self.inv_screen_scale = 1.0 / self.screen_scale;
     }
 
-    pub(crate) fn load_image<P: AsRef<Path>>(&mut self, path: P) -> Result<Image> {
-        let im = image::open(path)?;
-        let width = im.width();
-        let height = im.height();
-        let texture = self
-            .platform
-            .create_texture(im.into_bytes(), UVec2::new(width, height));
-        Ok(Image::new(texture, UVec2::new(width, height)))
-    }
-
-    pub(crate) fn create_text_texture(&mut self, text: Text) -> Result<Image> {
+    pub(crate) fn create_text_texture(&mut self, handle: Handle, text: Text) -> UVec2 {
         let Text {
             text,
             font,
@@ -179,11 +166,9 @@ impl Render {
         let width = buffer.width();
         let height = buffer.height();
         let size = UVec2::new(width, height);
-
-        let texture = self.platform.create_texture(buffer.into_vec(), size);
-        let mut image = Image::new(texture, size);
-        image.color = color;
-        Ok(image)
+        self.platform
+            .create_texture(handle, buffer.into_vec(), size);
+        size
     }
 
     pub(crate) fn scale_mode(&self) -> ScaleMode {
