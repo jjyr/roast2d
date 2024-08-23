@@ -23,8 +23,6 @@ use crate::{
 
 use super::Platform;
 
-const TARGET_FRAME_SECS: f32 = 1. / 60.;
-
 pub struct Texture {
     canvas: HtmlCanvasElement,
 }
@@ -300,7 +298,6 @@ impl Platform for WebPlatform {
         engine.render.resize(size);
 
         loop {
-            let frame_start = engine.platform_mut().now();
             if let Err(err) = engine.handle_assets().await {
                 log::error!("Handle assets error {:?}", err);
             }
@@ -309,20 +306,16 @@ impl Platform for WebPlatform {
             engine.platform_mut().prepare_frame();
             engine.update();
             engine.platform_mut().end_frame();
-            let frame_secs = engine.platform_mut().now() - frame_start;
-            let sleep_secs = TARGET_FRAME_SECS - frame_secs;
-            if sleep_secs > 0.0 {
-                sleep((sleep_secs * 1000.) as i32).await.unwrap();
-            }
+            wait_next_frame().await.unwrap();
         }
     }
 }
 
-fn sleep(ms: i32) -> JsFuture {
+fn wait_next_frame() -> JsFuture {
     JsFuture::from(js_sys::Promise::new(&mut |resolve, _| {
         web_sys::window()
             .unwrap()
-            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms)
+            .request_animation_frame(&resolve)
             .unwrap();
     }))
 }
