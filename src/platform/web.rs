@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     sync::mpsc::{channel, Receiver},
 };
@@ -16,6 +17,7 @@ use web_sys::{
 };
 
 use crate::{
+    color::{Color, WHITE},
     engine::Engine,
     handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
@@ -25,6 +27,62 @@ use super::Platform;
 
 pub struct Texture {
     canvas: HtmlCanvasElement,
+}
+
+impl Texture {
+    fn tint_color(&self, color: Color, document: &Document) -> Cow<HtmlCanvasElement> {
+        if color == WHITE {
+            return Cow::Borrowed(&self.canvas);
+        }
+
+        // new canvas
+        let canvas: HtmlCanvasElement = document
+            .create_element("canvas")
+            .unwrap()
+            .dyn_into()
+            .unwrap();
+        canvas.set_width(self.canvas.width());
+        canvas.set_height(self.canvas.height());
+
+        let ctx: CanvasRenderingContext2d = canvas
+            .get_context("2d")
+            .unwrap()
+            .unwrap()
+            .dyn_into()
+            .unwrap();
+
+        let origin_ctx: CanvasRenderingContext2d = self
+            .canvas
+            .get_context("2d")
+            .unwrap()
+            .unwrap()
+            .dyn_into()
+            .unwrap();
+        let image_data = origin_ctx
+            .get_image_data(
+                0.0,
+                0.0,
+                self.canvas.width() as f64,
+                self.canvas.height() as f64,
+            )
+            .unwrap();
+        let mut data = image_data.data();
+
+        for i in (0..data.len()).step_by(4) {
+            data[i] = ((data[i] as u32 * color.r as u32) / 255) as u8; // R
+            data[i + 1] = ((data[i + 1] as u32 * color.g as u32) / 255) as u8; // G
+            data[i + 2] = ((data[i + 2] as u32 * color.b as u32) / 255) as u8; // B
+        }
+
+        let image_data = ImageData::new_with_u8_clamped_array_and_sh(
+            Clamped(data.as_ref()),
+            canvas.width(),
+            canvas.height(),
+        )
+        .unwrap();
+        ctx.put_image_data(&image_data, 0.0, 0.0).unwrap();
+        Cow::Owned(canvas)
+    }
 }
 
 pub struct WebPlatform {
@@ -76,7 +134,7 @@ impl Platform for WebPlatform {
     fn draw(
         &mut self,
         texture: &crate::handle::Handle,
-        _color: crate::prelude::Color,
+        color: crate::prelude::Color,
         pos: glam::Vec2,
         size: glam::Vec2,
         uv_offset: glam::Vec2,
@@ -89,12 +147,9 @@ impl Platform for WebPlatform {
             log::debug!("Can't find image data");
             return;
         };
-        let uv_size = uv_size.unwrap_or_else(|| {
-            Vec2::new(
-                texture.canvas.width() as f32,
-                texture.canvas.height() as f32,
-            )
-        });
+        let canvas = texture.tint_color(color, &self.document);
+        let uv_size =
+            uv_size.unwrap_or_else(|| Vec2::new(canvas.width() as f32, canvas.height() as f32));
         let mut dx = pos.x;
         let mut dy = pos.y;
         // flip
@@ -112,7 +167,7 @@ impl Platform for WebPlatform {
             .unwrap();
         self.buf
             .draw_image_with_html_canvas_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
-                &texture.canvas,
+                &canvas,
                 uv_offset.x.round().into(),
                 uv_offset.y.round().into(),
                 uv_size.x.round().into(),
