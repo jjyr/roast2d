@@ -91,7 +91,7 @@ impl Platform for SDLPlatform {
         pos: Vec2,
         size: Vec2,
         uv_offset: Vec2,
-        uv_size: Vec2,
+        uv_size: Option<Vec2>,
         angle: f32,
         flip_x: bool,
         flip_y: bool,
@@ -100,6 +100,10 @@ impl Platform for SDLPlatform {
             log::debug!("Failed to get texture {}", handle.id());
             return;
         };
+        let uv_size = uv_size.unwrap_or_else(|| {
+            let q = texture.query();
+            Vec2::new(q.width as f32, q.height as f32)
+        });
 
         let src = sdl2::rect::Rect::new(
             uv_offset.x.round() as i32,
