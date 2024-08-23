@@ -87,6 +87,7 @@ impl Texture {
 
 pub struct WebPlatform {
     start: f64,
+    device_pixel_ratio: f64,
     window: Window,
     document: Document,
     buffer_canvas: HtmlCanvasElement,
@@ -102,10 +103,12 @@ impl WebPlatform {
         context: CanvasRenderingContext2d,
         buffer_canvas: HtmlCanvasElement,
         buf: CanvasRenderingContext2d,
+        device_pixel_ratio: f64,
     ) -> Self {
         let start = window.performance().unwrap().now();
         Self {
             window,
+            device_pixel_ratio,
             document,
             context,
             buffer_canvas,
@@ -160,22 +163,30 @@ impl Platform for WebPlatform {
             dy += size.y;
         }
         self.buf
-            .translate(dx.round().into(), dy.round().into())
+            .translate(
+                (dx as f64 * self.device_pixel_ratio).floor(),
+                (dy as f64 * self.device_pixel_ratio).floor(),
+            )
             .unwrap();
         self.buf
-            .scale(if flip_x { -1. } else { 1. }, if flip_y { -1. } else { 1. })
+            .scale(
+                if flip_x { -1.0 } else { 1.0 },
+                if flip_y { -1.0 } else { 1.0 },
+            )
             .unwrap();
+        let dw = (size.x as f64 * self.device_pixel_ratio).floor();
+        let dh = (size.y as f64 * self.device_pixel_ratio).floor();
         self.buf
             .draw_image_with_html_canvas_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                 &canvas,
-                uv_offset.x.round().into(),
-                uv_offset.y.round().into(),
-                uv_size.x.round().into(),
-                uv_size.y.round().into(),
+                uv_offset.x.floor().into(),
+                uv_offset.y.floor().into(),
+                uv_size.x.floor().into(),
+                uv_size.y.floor().into(),
                 0.0,
                 0.0,
-                size.x.round().into(),
-                size.y.round().into(),
+                dw,
+                dh,
             )
             .unwrap();
         // clear transform
@@ -242,10 +253,30 @@ impl Platform for WebPlatform {
             .dyn_into()
             .unwrap();
 
-        canvas.set_width(width);
-        canvas.set_height(height);
-        buffer_canvas.set_width(width);
-        buffer_canvas.set_height(height);
+        // Fix High Dpi blur <https://gist.github.com/callumlocke/cc258a193839691f60dd>
+        let dpr = window.device_pixel_ratio();
+        let width_px = (width as f64 * dpr).floor() as u32;
+        let height_px = (height as f64 * dpr).floor() as u32;
+        canvas.set_width(width_px);
+        canvas.set_height(height_px);
+        canvas
+            .style()
+            .set_property("width", &format!("{}px", width))
+            .unwrap();
+        canvas
+            .style()
+            .set_property("height", &format!("{}px", height))
+            .unwrap();
+        buffer_canvas.set_width(width_px);
+        buffer_canvas.set_height(height_px);
+        buffer_canvas
+            .style()
+            .set_property("width", &format!("{}px", width))
+            .unwrap();
+        buffer_canvas
+            .style()
+            .set_property("height", &format!("{}px", height))
+            .unwrap();
 
         let context = canvas
             .get_context("2d")
@@ -343,7 +374,7 @@ impl Platform for WebPlatform {
 
         // setup
         let mut engine = {
-            let platform = WebPlatform::new(window, document, context, buffer_canvas, buffer);
+            let platform = WebPlatform::new(window, document, context, buffer_canvas, buffer, dpr);
             Engine::new(Box::new(platform))
         };
 

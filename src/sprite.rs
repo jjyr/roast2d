@@ -46,7 +46,7 @@ impl Sprite {
 
     /// Build image from texture
     pub fn with_sizef(texture: Handle, size: Vec2) -> Self {
-        let size = UVec2::new(size.x.round() as u32, size.y.round() as u32);
+        let size = UVec2::new(size.x.floor() as u32, size.y.floor() as u32);
         Self::new(texture, size)
     }
 }

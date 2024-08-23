@@ -104,8 +104,8 @@ impl Render {
         flip_x: bool,
         flip_y: bool,
     ) {
-        let cols = ((image.size().x as f32 - image.padding) / (tile_size.x + image.spacing)).round()
-            as u32;
+        let cols =
+            ((image.size().x as f32 - image.padding) / (tile_size.x + image.spacing)).ceil() as u32;
         let row = tile as u32 / cols;
         let col = tile as u32 % cols;
         let src_pos = Vec2::new(

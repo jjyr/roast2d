@@ -106,16 +106,16 @@ impl Platform for SDLPlatform {
         });
 
         let src = sdl2::rect::Rect::new(
-            uv_offset.x.round() as i32,
-            uv_offset.y.round() as i32,
-            uv_size.x.round() as u32,
-            uv_size.y.round() as u32,
+            uv_offset.x.floor() as i32,
+            uv_offset.y.floor() as i32,
+            uv_size.x.floor() as u32,
+            uv_size.y.floor() as u32,
         );
         let dst = sdl2::rect::Rect::new(
-            pos.x.round() as i32,
-            pos.y.round() as i32,
-            size.x.round() as u32,
-            size.y.round() as u32,
+            pos.x.floor() as i32,
+            pos.y.floor() as i32,
+            size.x.floor() as u32,
+            size.y.floor() as u32,
         );
 
         texture.set_color_mod(color.r, color.g, color.b);
