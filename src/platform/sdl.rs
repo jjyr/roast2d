@@ -402,7 +402,7 @@ impl SDLEventHandler {
             }
         }
         if self.gamepad.is_none() {
-            log::error!("No game controller");
+            log::warn!("No game controller");
         }
     }
 }
