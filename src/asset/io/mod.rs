@@ -21,7 +21,7 @@ pub trait AssetReader: Send + Sync + 'static {
 
 pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
-/// From bevy https://github.com/bevyengine/bevy/blob/main/crates/bevy_asset/src/io/mod.rs#L186
+/// From bevy <https://github.com/bevyengine/bevy/blob/main/crates/bevy_asset/src/io/mod.rs#L186>
 /// Equivalent to AssetReader, but nessacery for trait object safe
 pub trait ErasedAssetReader: Send + Sync + 'static {
     /// Returns a future to load the full file data at the provided path.
