@@ -8,10 +8,9 @@ use crate::{
     handle::Handle,
 };
 
-/// Image
-/// Use Engine#load_image to get a image
+/// Sprite
 #[derive(Clone)]
-pub struct Image {
+pub struct Sprite {
     /// texture
     pub texture: Handle,
     /// size
@@ -30,7 +29,7 @@ pub struct Image {
     pub flip_y: bool,
 }
 
-impl Image {
+impl Sprite {
     /// Build image from texture
     pub fn new(texture: Handle, size: UVec2) -> Self {
         Self {
@@ -44,16 +43,22 @@ impl Image {
             flip_y: false,
         }
     }
+
+    /// Build image from texture
+    pub fn with_sizef(texture: Handle, size: Vec2) -> Self {
+        let size = UVec2::new(size.x.round() as u32, size.y.round() as u32);
+        Self::new(texture, size)
+    }
 }
 
-impl Debug for Image {
+impl Debug for Sprite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let size = self.size();
         f.debug_struct("Image").field("size", &size).finish()
     }
 }
 
-impl Image {
+impl Sprite {
     /// Return image size
     pub fn size(&self) -> UVec2 {
         self.size

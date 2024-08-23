@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::mpsc::{channel, Receiver, Sender},
-};
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::{anyhow, Result};
 use glam::{UVec2, Vec2};
@@ -20,7 +17,7 @@ use sdl2::{
 use crate::{
     color::Color,
     engine::Engine,
-    handle::{DropEvent, Handle},
+    handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
 };
 
@@ -59,42 +56,30 @@ impl ScreenBuffer {
 pub struct SDLPlatform {
     screen_buffer: ScreenBuffer,
     textures: HashMap<u64, Texture>,
-    handle_id: u64,
-    receiver: Receiver<DropEvent>,
-    sender: Sender<DropEvent>,
+    start: Instant,
 }
 
 impl SDLPlatform {
     fn new(screen_buffer: ScreenBuffer) -> Self {
-        let (sender, receiver) = channel();
         Self {
             screen_buffer,
             textures: Default::default(),
-            handle_id: 0,
-            sender,
-            receiver,
+            start: Instant::now(),
         }
-    }
-
-    fn alloc_handle(&mut self) -> Handle {
-        let id = self.handle_id;
-        self.handle_id += 1;
-        let drop_sender = self.sender.clone();
-        Handle::new(id, drop_sender)
     }
 }
 
 impl Platform for SDLPlatform {
+    fn now(&mut self) -> f32 {
+        self.start.elapsed().as_secs_f32()
+    }
+
     fn prepare_frame(&mut self) {
         self.screen_buffer.clear();
     }
 
     fn end_frame(&mut self) {
         self.screen_buffer.present();
-
-        while let Ok(event) = self.receiver.try_recv() {
-            self.textures.remove(&event.0);
-        }
     }
 
     fn cleanup(&mut self) {}
@@ -111,6 +96,11 @@ impl Platform for SDLPlatform {
         flip_x: bool,
         flip_y: bool,
     ) {
+        let Some(texture) = self.textures.get_mut(&handle.id()) else {
+            log::debug!("Failed to get texture {}", handle.id());
+            return;
+        };
+
         let src = sdl2::rect::Rect::new(
             uv_offset.x.round() as i32,
             uv_offset.y.round() as i32,
@@ -124,11 +114,6 @@ impl Platform for SDLPlatform {
             size.y.round() as u32,
         );
 
-        let Some(texture) = self.textures.get_mut(&handle.id()) else {
-            log::error!("Failed to get texture {}", handle.id());
-            return;
-        };
-
         texture.set_color_mod(color.r, color.g, color.b);
 
         self.screen_buffer
@@ -137,7 +122,7 @@ impl Platform for SDLPlatform {
             .unwrap();
     }
 
-    fn create_texture(&mut self, mut data: Vec<u8>, size: UVec2) -> Handle {
+    fn create_texture(&mut self, handle: Handle, mut data: Vec<u8>, size: UVec2) {
         let UVec2 {
             x: width,
             y: height,
@@ -153,13 +138,14 @@ impl Platform for SDLPlatform {
             .create_texture_from_surface(surface)
             .unwrap();
 
-        let handle = self.alloc_handle();
         self.textures.insert(handle.id(), texture);
-
-        handle
     }
 
-    fn run<Setup: FnOnce(&mut Engine)>(
+    fn remove_texture(&mut self, handle_id: HandleId) {
+        self.textures.remove(&handle_id);
+    }
+
+    async fn run<Setup: FnOnce(&mut Engine)>(
         title: String,
         width: u32,
         height: u32,
@@ -212,6 +198,9 @@ impl Platform for SDLPlatform {
             .resize(event_handler.window.drawable_size().into());
 
         while !event_handler.wants_to_exit {
+            if let Err(err) = engine.handle_assets().await {
+                log::error!("Handle assets error {:?}", err);
+            }
             event_handler
                 .pump_events(&mut engine)
                 .map_err(|err| anyhow!(err))?;

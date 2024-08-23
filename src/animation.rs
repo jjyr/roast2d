@@ -1,14 +1,14 @@
 use glam::Vec2;
 
-use crate::{image::Image, render::Render};
+use crate::{render::Render, sprite::Sprite};
 
 #[derive(Clone)]
 pub struct Animation {
-    pub sheet: Image,
+    pub sheet: Sprite,
 }
 
 impl Animation {
-    pub fn new(sheet: Image) -> Self {
+    pub fn new(sheet: Sprite) -> Self {
         Self { sheet }
     }
     pub(crate) fn draw(&mut self, render: &mut Render, pos: Vec2) {

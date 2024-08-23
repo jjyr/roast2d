@@ -1,10 +1,11 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use glam::{UVec2, Vec2};
 
 use crate::{
-    image::Image,
+    handle::Handle,
     ldtk::{LdtkLevel, LdtkLevelLayerInstance, LdtkProject},
     render::Render,
+    sprite::Sprite,
 };
 
 pub(crate) const FOREGROUND: &str = "foreground";
@@ -33,7 +34,7 @@ pub struct Map {
     pub foreground: bool,
 
     // The tileset image to use when drawing. Might be NULL for collision maps
-    pub tileset: Image,
+    pub tileset: Sprite,
 
     // The tile indices with a length of size.x * size.y
     pub data: Vec<Tile>,
@@ -52,15 +53,18 @@ impl Map {
         level: &LdtkLevel,
         layer_index: usize,
         layer: &LdtkLevelLayerInstance,
-        mut tileset: Image,
+        tileset_texture: Handle,
     ) -> Result<Self> {
-        if let Some(tileset_def) = layer
+        let tileset_def = layer
             .tileset_def_uid
             .and_then(|uid| project.get_tileset(uid))
-        {
-            tileset.spacing = tileset_def.spacing as f32;
-            tileset.padding = tileset_def.padding as f32;
-        }
+            .ok_or_else(|| anyhow!("No tileset def"))?;
+        let mut tileset = {
+            let size = UVec2::new(tileset_def.px_wid, tileset_def.px_hei);
+            Sprite::new(tileset_texture, size)
+        };
+        tileset.spacing = tileset_def.spacing as f32;
+        tileset.padding = tileset_def.padding as f32;
 
         let size = UVec2::new(layer.c_wid, layer.c_hei);
         let tile_size = layer.grid_size as f32;

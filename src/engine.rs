@@ -1,15 +1,13 @@
 use std::{
     any::{type_name, Any},
-    path::Path,
     rc::Rc,
-    time::Instant,
 };
 
 use anyhow::{bail, Result};
-use glam::Vec2;
+use glam::{UVec2, Vec2};
 
 use crate::{
-    assets::AssetsManager,
+    asset::{AssetManager, FetchedTask},
     camera::Camera,
     collision_map::{CollisionMap, COLLISION_MAP},
     commands::{Command, Commands},
@@ -18,13 +16,14 @@ use crate::{
         EntityRef, EntityType, EntityTypeId, World,
     },
     font::Text,
-    image::Image,
+    handle::Handle,
     input::InputState,
     ldtk::{LayerType, LdtkProject},
     map::{map_draw, Map},
     platform::Platform,
     render::{Render, ResizeMode, ScaleMode},
     sorts::insertion_sort_by_key,
+    sprite::Sprite,
     trace::Trace,
     types::SweepAxis,
 };
@@ -113,10 +112,7 @@ pub struct Engine {
     // commands
     pub(crate) commands: Commands,
     // AssetsManager
-    pub assets: AssetsManager,
-
-    // time
-    start_time: Instant,
+    pub assets: AssetManager,
 }
 
 impl Engine {
@@ -137,11 +133,10 @@ impl Engine {
             scene_next: None,
             world: Default::default(),
             render: Render::new(platform),
-            start_time: Instant::now(),
             input: InputState::default(),
             commands: Commands::default(),
             sweep_axis: SweepAxis::default(),
-            assets: AssetsManager::new("assets"),
+            assets: AssetManager::new("assets"),
         }
     }
 
@@ -208,26 +203,22 @@ impl Engine {
         Some(self.world.spawn(ent))
     }
 
-    /// Load image from path
-    pub fn load_image<P: AsRef<Path>>(&mut self, path: P) -> Result<Image> {
-        let full_path = self.assets.get_full_path(path);
-        self.render.load_image(full_path)
-    }
-
     /// Create text
-    pub fn create_text_texture(&mut self, text: Text) -> Result<Image> {
-        self.render.create_text_texture(text)
+    pub fn create_text_texture(&mut self, text: Text) -> (Handle, UVec2) {
+        let handle = self.assets.alloc_handle();
+        let size = self.render.create_text_texture(handle.clone(), text);
+        (handle, size)
     }
 
     /// Draw image
-    pub fn draw_image(&mut self, image: &Image, pos: Vec2) {
+    pub fn draw_image(&mut self, image: &Sprite, pos: Vec2) {
         self.render.draw_image(image, pos);
     }
 
     /// Draw image as tile
     pub fn draw_tile(
         &mut self,
-        image: &Image,
+        image: &Sprite,
         tile: u16,
         tile_size: Vec2,
         dst_pos: Vec2,
@@ -279,8 +270,8 @@ impl Engine {
     }
 
     // Return seconds since game start
-    pub fn now(&self) -> f32 {
-        self.start_time.elapsed().as_secs_f32()
+    pub fn now(&mut self) -> f32 {
+        self.platform_mut().now()
     }
 
     // World
@@ -315,9 +306,6 @@ impl Engine {
 
     pub(crate) fn init(&mut self) {
         self.time_real = self.now();
-        // sound_init(platform_samplerate());
-        // platform_set_audio_mix_cb(sound_mix_stereo);
-        // main_init();
     }
 
     /// Scene base draw, draw maps and entities
@@ -528,6 +516,21 @@ impl Engine {
         self.perf.total = self.now() - time_frame_start;
     }
 
+    pub(crate) async fn handle_assets(&mut self) -> Result<()> {
+        let tasks = self.assets.fetch().await?;
+        for task in tasks {
+            match task {
+                FetchedTask::CreateTexture { handle, data, size } => {
+                    self.platform_mut().create_texture(handle, data, size);
+                }
+                FetchedTask::RemoveTexture { handle } => {
+                    self.platform_mut().remove_texture(handle);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Set a scene, the scene swap do not happend instantly, it is happend in engine update
     pub fn set_scene(&mut self, scene: impl Scene + 'static) {
         self.scene_next.replace(Box::new(scene));
@@ -550,7 +553,7 @@ impl Engine {
                 }
                 LayerType::AutoLayer | LayerType::Tiles => {
                     let tileset = if let Some(rel_path) = layer.tileset_rel_path.as_ref() {
-                        self.load_image(rel_path)?
+                        self.assets.load_texture(rel_path)
                     } else {
                         bail!(
                             "Layer {}-{} doesn't has tileset",
@@ -598,6 +601,7 @@ impl Engine {
         self.is_running
     }
 
+    #[allow(dead_code)]
     pub(crate) fn cleanup(&mut self) {
         // Do nothing
     }

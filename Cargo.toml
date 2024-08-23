@@ -1,11 +1,11 @@
 [package]
-name = "roast-2d"
-version = "0.0.3"
-edition = "2021"
 authors = ["jjy"]
-license = "MIT"
-repository = "https://github.com/jjyr/roast2d"
 description = "Roast2D is a homebrew 2D game engine inspired by high_impact"
+edition = "2021"
+license = "MIT"
+name = "roast-2d"
+repository = "https://github.com/jjyr/roast2d"
+version = "0.0.3"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -13,38 +13,45 @@ crate-type = ["cdylib", "rlib"]
 [features]
 debug_mut = []
 # Require SDL2 platform
-sdl2-static-link = ["sdl2/static-link"]
 sdl2-bundled = ["sdl2/bundled"]
+sdl2-static-link = ["sdl2/static-link"]
 # Require Web platform
-wasm-debug = ["console_error_panic_hook"]
+web-debug = ["console_error_panic_hook"]
 
 [dependencies]
 anyhow = "1.0.86"
 bitflags = "2.6.0"
-cfg-if = "1.0.0"
 dyn-clone = "1.0.17"
 glam = "0.28.0"
-image = { version = "0.25.2", default-features = false, features = ["png"] }
+image = {version = "0.25.2", default-features = false, features = ["png"]}
 log = "0.4.22"
 rusttype = "0.9.3"
-serde = { version = "1.0.207", features = ["derive"] }
+serde = {version = "1.0.207", features = ["derive"]}
 serde_json = "1.0.124"
 
 # Non-Wasm32 target
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-sdl2 = { version = "0.37.0", features = ["unsafe_textures"] }
+sdl2 = {version = "0.37.0", features = ["unsafe_textures"]}
+futures-lite = "2.3"
 
 # Wasm32 target
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = {version = "0.1.7", optional = true}
+console_log = "1.0"
+js-sys = "0.3"
 wasm-bindgen = "0.2"
-console_error_panic_hook = { version = "0.1.7", optional = true }
+wasm-bindgen-futures = "0.4"
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3"
+features = ["Window", "Document", "Element", "HtmlCanvasElement", "CanvasRenderingContext2d", "WorkerGlobalScope", "Response", "ImageData", "ImageBitmap", "MouseEvent", "KeyboardEvent", "Performance"]
 
 [lints.clippy]
 too_many_arguments = "allow"
 
 [dev-dependencies]
 rand = "0.8.5"
+env_logger = "0.11"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+getrandom = {version = "0.2", features = ["js"]}
 wasm-bindgen-test = "0.3"
-getrandom = { version = "0.2", features = ["js"] }

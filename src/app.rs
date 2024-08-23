@@ -1,10 +1,7 @@
 use anyhow::Result;
 use glam::UVec2;
 
-use crate::{
-    engine::Engine,
-    platform::{DefaultPlatform, Platform},
-};
+use crate::{engine::Engine, platform::platform_run};
 
 #[derive(Debug)]
 pub struct App {
@@ -40,7 +37,7 @@ impl App {
     }
 
     /// Run the game
-    pub fn run<Setup: FnOnce(&mut Engine)>(self, setup: Setup) -> Result<()> {
+    pub async fn run<Setup: FnOnce(&mut Engine)>(self, setup: Setup) -> Result<()> {
         let App {
             title,
             window: UVec2 {
@@ -49,6 +46,12 @@ impl App {
             },
             vsync,
         } = self;
-        DefaultPlatform::run(title, width, height, vsync, setup)
+        platform_run(title, width, height, vsync, setup).await
+    }
+
+    /// Run the game
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn run_block<Setup: FnOnce(&mut Engine)>(self, setup: Setup) -> Result<()> {
+        futures_lite::future::block_on(self.run(setup))
     }
 }
