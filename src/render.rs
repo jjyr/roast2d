@@ -56,7 +56,7 @@ impl Render {
         mut pos: Vec2,
         mut size: Vec2,
         uv_offset: Vec2,
-        uv_size: Vec2,
+        uv_size: Option<Vec2>,
         flip_x: bool,
         flip_y: bool,
     ) {
@@ -79,14 +79,18 @@ impl Render {
 
     /// Draw image
     pub fn draw_image(&mut self, image: &Sprite, pos: Vec2) {
-        let size = image.size();
-        self.draw_tile(
-            image,
-            0,
-            Vec2::new(size.x as f32, size.y as f32),
+        let dst_size = image.sizef() * image.scale;
+
+        // color
+        self.draw(
+            &image.texture,
+            image.color,
             pos,
-            false,
-            false,
+            dst_size,
+            Vec2::ZERO,
+            None,
+            image.flip_x,
+            image.flip_y,
         );
     }
 
@@ -120,7 +124,7 @@ impl Render {
             dst_pos,
             dst_size,
             src_pos,
-            src_size,
+            Some(src_size),
             flip_x,
             flip_y,
         );

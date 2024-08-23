@@ -82,7 +82,7 @@ impl Platform for WebPlatform {
         pos: glam::Vec2,
         size: glam::Vec2,
         uv_offset: glam::Vec2,
-        uv_size: glam::Vec2,
+        uv_size: Option<glam::Vec2>,
         _angle: f32,
         flip_x: bool,
         flip_y: bool,
@@ -91,6 +91,12 @@ impl Platform for WebPlatform {
             log::debug!("Can't find image data");
             return;
         };
+        let uv_size = uv_size.unwrap_or_else(|| {
+            Vec2::new(
+                texture.canvas.width() as f32,
+                texture.canvas.height() as f32,
+            )
+        });
         let mut dx = pos.x;
         let mut dy = pos.y;
         // flip

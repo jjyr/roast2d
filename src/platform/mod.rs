@@ -25,7 +25,7 @@ pub trait Platform {
         pos: Vec2,
         size: Vec2,
         uv_offset: Vec2,
-        uv_size: Vec2,
+        uv_size: Option<Vec2>,
         angle: f32,
         flip_x: bool,
         flip_y: bool,
