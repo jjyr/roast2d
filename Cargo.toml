@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 name = "roast-2d"
 repository = "https://github.com/jjyr/roast2d"
-version = "0.0.3"
+version = "0.0.4"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
