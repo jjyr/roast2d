@@ -48,7 +48,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub(crate) fn viewport_target(&self, screen_size: Vec2, bounds: Option<Vec2>) -> Vec2 {
+    fn viewport_target(&self, screen_size: Vec2, bounds: Option<Vec2>) -> Vec2 {
         let screen_center = screen_size * 0.5;
         let mut viewport_target = self.pos - screen_center + self.offset;
         if let Some(bounds) = bounds {

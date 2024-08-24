@@ -106,6 +106,7 @@ impl WebPlatform {
         device_pixel_ratio: f64,
     ) -> Self {
         let start = window.performance().unwrap().now();
+
         Self {
             window,
             device_pixel_ratio,
@@ -121,7 +122,19 @@ impl WebPlatform {
 
 impl Platform for WebPlatform {
     fn prepare_frame(&mut self) {
-        self.buf.reset();
+        // Clear canvas
+        self.context.clear_rect(
+            0.0,
+            0.0,
+            self.buffer_canvas.width() as f64,
+            self.buffer_canvas.height() as f64,
+        );
+        self.buf.clear_rect(
+            0.0,
+            0.0,
+            self.buffer_canvas.width() as f64,
+            self.buffer_canvas.height() as f64,
+        );
     }
 
     fn end_frame(&mut self) {
@@ -190,9 +203,7 @@ impl Platform for WebPlatform {
             )
             .unwrap();
         // clear transform
-        self.buf
-            .set_transform_with_default_dom_matrix_2d_init()
-            .unwrap();
+        self.buf.reset_transform().unwrap();
     }
 
     fn create_texture(&mut self, handle: Handle, data: Vec<u8>, size: glam::UVec2) {
@@ -374,6 +385,8 @@ impl Platform for WebPlatform {
 
         // setup
         let mut engine = {
+            // disable image smoothing to fix weired tile gaps
+            buffer.set_image_smoothing_enabled(false);
             let platform = WebPlatform::new(window, document, context, buffer_canvas, buffer, dpr);
             Engine::new(Box::new(platform))
         };
