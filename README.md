@@ -10,9 +10,13 @@ Roast2D provides entity object with built-in behaviors. Developers can define en
 - Built-in integration with [LDTK][LDTK] level editor
 - Multi-platform support (via SDL2 and WebAssembly)
 
-## Usage
 
-Explore [/examples](https://github.com/jjyr/roast2d/tree/master/examples) to see how to use Roast2D.
+## Examples
+
+* An mini [ping-pong game][demo] shows the basic usage 
+* A 2D platformer prototype [balloon game][balloon] shows how to integrate with LDTK, kira (audio) and support web platform.
+
+## Usage
 
 Run example:
 
@@ -46,3 +50,5 @@ The source code is licensed under MIT.
 [SDL2]: https://github.com/Rust-SDL2/rust-sdl2?tab=readme-ov-file#sdl20-development-libraries
 [LDTK]: https://ldtk.io/
 [high_impact]: https://github.com/phoboslab/high_impact
+[demo]: https://github.com/jjyr/roast2d/tree/master/examples
+[balloon]: https://github.com/jjyr/balloon-game
