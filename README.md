@@ -42,6 +42,8 @@ Make sure the SDL2 library is installed on your machine before developing. [This
 
 WebAssembly backend is implement with web canvas interface, you must make sure the game can build with `wasm32-unknown-unknown` target. Ensure you have [wasm-pack][wasm-pack] installed, and use `wasm-pack build` to build project. 
 
+To render the game, ensure you provide a `<canvas>` element with the id `#roast-2d-canvas`.
+
 ## License
 
 The source code is licensed under MIT.
