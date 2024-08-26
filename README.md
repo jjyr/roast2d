@@ -1,8 +1,8 @@
 # Roast2D
 
-Roast2D is a flexible 2D game engine written in Rust. Inspired by [high_impact][high_impact].
+Roast2D is a rapid development 2D game engine written in Rust. Inspired by [high_impact][high_impact].
 
-Roast2D provides entity object with built-in behaviors. Developers can define entity type and extend entity behaviors through `EntityType` trait. Additionally, Roast2D has built-in integration with the [LDTK][LDTK] level editor, making it suitable for rapid development.
+I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d)
 
 ## Features
 
