@@ -9,7 +9,6 @@ const BALL_MAX_VEL: f32 = 300.0;
 const PLAYER_VEL: f32 = 600.0;
 const FRICTION: f32 = 4.0;
 const WALL_THICK: f32 = 200.0;
-const SPRITE_SIZE: f32 = 8.0;
 const BRICK_SIZE: Vec2 = Vec2::new(64., 32.);
 const BRICK_DYING: f32 = 0.3;
 const TEXTURE_PATH: &str = "demo.png";
@@ -54,8 +53,7 @@ pub struct Ball {
 impl EntityType for Ball {
     fn load(eng: &mut Engine) -> Self {
         let size = Vec2::new(32., 32.0);
-        let mut sheet = Sprite::new(load_texture(eng), UVec2::splat(SPRITE_SIZE as u32));
-        sheet.scale = size / SPRITE_SIZE;
+        let mut sheet = Sprite::with_sizef(load_texture(eng), size);
         sheet.color = Color::rgb(0xfb, 0xf2, 0x36);
         let anim = Animation::new(sheet);
         Ball { size, anim }
@@ -175,8 +173,7 @@ pub struct Brick {
 
 impl EntityType for Brick {
     fn load(eng: &mut Engine) -> Self {
-        let mut sheet = Sprite::new(load_texture(eng), UVec2::splat(SPRITE_SIZE as u32));
-        sheet.scale = BRICK_SIZE / SPRITE_SIZE;
+        let mut sheet = Sprite::with_sizef(load_texture(eng), BRICK_SIZE);
         sheet.color = Color::rgb(0x5b, 0x6e, 0xe1);
         let anim = Animation::new(sheet);
         Brick {
@@ -227,7 +224,7 @@ impl EntityType for Brick {
                 ent.pos = center_pos - size * 0.5;
                 ent.size = size;
 
-                anim.sheet.scale = size / SPRITE_SIZE;
+                anim.sheet.scale = Vec2::splat(scale);
                 anim.sheet.color = color;
             }
         }
@@ -249,9 +246,8 @@ pub struct Player {
 
 impl EntityType for Player {
     fn load(eng: &mut Engine) -> Self {
-        let mut sheet = Sprite::new(load_texture(eng), UVec2::splat(SPRITE_SIZE as u32));
         let size = Vec2::new(128.0, 48.0);
-        sheet.scale = size / SPRITE_SIZE;
+        let mut sheet = Sprite::with_sizef(load_texture(eng), size);
         sheet.color = Color::rgb(0x37, 0x94, 0x6e);
         let anim = Animation::new(sheet);
 
