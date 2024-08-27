@@ -191,16 +191,20 @@ impl Engine {
 
     pub fn spawn_with_type_id(&mut self, ent_type: EntityTypeId, pos: Vec2) -> Option<EntityRef> {
         let instance = self.world.get_entity_type_instance(&ent_type)?;
-
         let id = self.world.unique_id;
+
+        // add to world
+        let ent = Entity::new(id, ent_type, instance, pos);
+        let ent_ref = self.world.spawn(ent);
+
         // init
-        let mut ent = Entity::new(id, ent_type, instance, pos);
+        let ent = self.world.get(ent_ref).expect("mut ent");
+        let mut ent = ent.borrow_mut();
         with_ent!(ent, |instance: &mut Box<dyn EntityType>| {
             instance.init(self, &mut ent);
         });
 
-        // add to world
-        Some(self.world.spawn(ent))
+        Some(ent_ref)
     }
 
     /// Create text
