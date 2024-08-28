@@ -1,6 +1,8 @@
 use glam::{UVec2, Vec2};
 
-use crate::{color::Color, font::Text, handle::Handle, platform::Platform, sprite::Sprite};
+use crate::{
+    color::Color, font::Text, handle::Handle, platform::Platform, sprite::Sprite, types::Rect,
+};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub enum ScaleMode {
@@ -53,42 +55,54 @@ impl Render {
         &mut self,
         handle: &Handle,
         color: Color,
-        mut pos: Vec2,
-        mut size: Vec2,
-        uv_offset: Vec2,
-        uv_size: Option<Vec2>,
+        src: Option<Rect>,
+        dst: Rect,
+        angle: Option<f32>,
         flip_x: bool,
         flip_y: bool,
     ) {
-        if pos.x > self.logical_size.x
-            || pos.y > self.logical_size.y
-            || pos.x + size.x < 0.
-            || pos.y + size.y < 0.
+        if dst.min.x > self.logical_size.x
+            || dst.min.y > self.logical_size.y
+            || dst.max.x < 0.
+            || dst.max.y < 0.
         {
             return;
         }
 
-        pos *= self.screen_scale;
-        size *= self.screen_scale;
+        // screen scale
+        let dst = Rect {
+            min: dst.min * self.screen_scale,
+            max: dst.max * self.screen_scale,
+        };
+
         self.draw_calls += 1;
 
-        self.platform.draw(
-            handle, color, pos, size, uv_offset, uv_size, 0.0, flip_x, flip_y,
-        );
+        self.platform
+            .draw(handle, color, src, dst, angle, flip_x, flip_y);
     }
 
     /// Draw image
-    pub fn draw_image(&mut self, image: &Sprite, pos: Vec2) {
-        let dst_size = image.sizef() * image.scale;
+    pub fn draw_image(
+        &mut self,
+        image: &Sprite,
+        pos: Vec2,
+        scale: Option<Vec2>,
+        angle: Option<f32>,
+    ) {
+        let dst_size = scale
+            .map(|s| image.sizef() * s)
+            .unwrap_or_else(|| image.sizef());
 
-        // color
+        let dst = Rect {
+            min: pos,
+            max: pos + dst_size,
+        };
         self.draw(
             &image.texture,
             image.color,
-            pos,
-            dst_size,
-            Vec2::ZERO,
             None,
+            dst,
+            angle,
             image.flip_x,
             image.flip_y,
         );
@@ -101,6 +115,8 @@ impl Render {
         tile: u16,
         tile_size: Vec2,
         dst_pos: Vec2,
+        scale: Option<Vec2>,
+        angle: Option<f32>,
         flip_x: bool,
         flip_y: bool,
     ) {
@@ -113,18 +129,26 @@ impl Render {
             row as f32 * (tile_size.y + image.spacing) + image.padding,
         );
         let src_size = Vec2::new(tile_size.x, tile_size.y);
-        let dst_size = src_size * image.scale;
+        let dst_size = scale.map(|s| s * src_size).unwrap_or_else(|| src_size);
 
         // color
         let flip_x = flip_x || image.flip_x;
         let flip_y = flip_y || image.flip_y;
+
+        let src = Rect {
+            min: src_pos,
+            max: src_pos + src_size,
+        };
+        let dst = Rect {
+            min: dst_pos,
+            max: dst_pos + dst_size,
+        };
         self.draw(
             &image.texture,
             image.color,
-            dst_pos,
-            dst_size,
-            src_pos,
-            Some(src_size),
+            Some(src),
+            dst,
+            angle,
             flip_x,
             flip_y,
         );

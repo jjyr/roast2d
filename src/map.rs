@@ -122,6 +122,8 @@ fn map_draw_tile(render: &mut Render, map: &Map, tile: &Tile, pos: Vec2) {
         tile.tile_id,
         Vec2::splat(map.tile_size),
         pos,
+        None,
+        None,
         tile.flip_x,
         tile.flip_y,
     );

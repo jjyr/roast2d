@@ -15,8 +15,6 @@ pub struct Sprite {
     pub texture: Handle,
     /// size
     pub size: UVec2,
-    /// image scale size
-    pub scale: Vec2,
     /// color
     pub color: Color,
     /// Spacing
@@ -35,7 +33,6 @@ impl Sprite {
         Self {
             texture,
             size,
-            scale: Vec2::splat(1.0),
             color: WHITE,
             spacing: 0.0,
             padding: 0.0,

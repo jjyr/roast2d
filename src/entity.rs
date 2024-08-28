@@ -124,6 +124,8 @@ pub struct Entity {
     pub group: EntityGroup,
     pub check_against: EntityGroup,
     pub pos: Vec2,
+    pub scale: Vec2,
+    pub angle: f32,
     pub size: Vec2,
     pub vel: Vec2,
     pub accel: Vec2,
@@ -173,14 +175,22 @@ impl Entity {
             min_slide_normal: 1.0,   // cosf(to_radians(0))
             anim: None,
             instance,
+            scale: Vec2::splat(1.0),
+            angle: 0.0,
         }
     }
 
     pub(crate) fn is_touching(&self, other: &Entity) -> bool {
-        !(self.pos.x >= other.pos.x + other.size.x
-            || self.pos.x + self.size.x <= other.pos.x
-            || self.pos.y >= other.pos.y + other.size.y
-            || self.pos.y + self.size.y <= other.pos.y)
+        let self_size = self.scaled_size();
+        let other_size = other.scaled_size();
+        !(self.pos.x >= other.pos.x + other_size.x
+            || self.pos.x + self_size.x <= other.pos.x
+            || self.pos.y >= other.pos.y + other_size.y
+            || self.pos.y + self_size.y <= other.pos.y)
+    }
+
+    pub fn scaled_size(&self) -> Vec2 {
+        self.size * self.scale
     }
 }
 
@@ -220,7 +230,12 @@ pub trait EntityType: DynClone {
     // Draw entity anim
     fn draw(&self, eng: &mut Engine, ent: &mut Entity, viewport: Vec2) {
         if let Some(anim) = ent.anim.as_mut() {
-            anim.draw(&mut eng.render, (ent.pos - viewport) - ent.offset);
+            anim.draw(
+                &mut eng.render,
+                (ent.pos - viewport) - ent.offset,
+                Some(ent.scale),
+                Some(ent.angle),
+            );
         }
     }
 
@@ -343,15 +358,17 @@ impl World {
 
 /// Resolve entity collision
 pub(crate) fn resolve_collision(eng: &mut Engine, a: &mut Entity, b: &mut Entity) {
+    let a_size = a.scaled_size();
+    let b_size = b.scaled_size();
     let overlap_x: f32 = if a.pos.x < b.pos.x {
-        a.pos.x + a.size.x - b.pos.x
+        a.pos.x + a_size.x - b.pos.x
     } else {
-        b.pos.x + b.size.x - a.pos.x
+        b.pos.x + b_size.x - a.pos.x
     };
     let overlap_y: f32 = if a.pos.y < b.pos.y {
-        a.pos.y + a.size.y - b.pos.y
+        a.pos.y + a_size.y - b.pos.y
     } else {
-        b.pos.y + b.size.y - a.pos.y
+        b.pos.y + b_size.y - a.pos.y
     };
 
     let a_move;
@@ -465,7 +482,7 @@ pub(crate) fn entities_separate_on_y_axis(
 pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Entity, vstep: Vec2) {
     if ent.physics.contains(EntityPhysics::WORLD) && eng.collision_map.is_some() {
         let map = eng.collision_map.as_ref().unwrap();
-        let t = trace(map, ent.pos, vstep, ent.size);
+        let t = trace(map, ent.pos, vstep, ent.scaled_size());
         handle_trace_result(eng, ent, &t);
         // The previous trace was stopped short and we still have some velocity
         // left? Do a second trace with the new velocity. this allows us
@@ -478,7 +495,7 @@ pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Entity, vstep: Vec2) {
                 let remaining = 1. - t.length;
                 let vstep2 = rotated_normal * (vel_along_normal * remaining);
                 let map = eng.collision_map.as_ref().unwrap();
-                let t2 = trace(map, ent.pos, vstep2, ent.size);
+                let t2 = trace(map, ent.pos, vstep2, ent.scaled_size());
                 handle_trace_result(eng, ent, &t2);
             }
         }

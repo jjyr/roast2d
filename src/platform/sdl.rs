@@ -19,6 +19,7 @@ use crate::{
     engine::Engine,
     handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
+    types::Rect,
 };
 
 use super::Platform;
@@ -50,6 +51,18 @@ impl ScreenBuffer {
 
     pub(crate) fn clear(&mut self) {
         self.canvas.clear();
+    }
+}
+
+impl From<Rect> for sdl2::rect::Rect {
+    fn from(value: Rect) -> Self {
+        let size = value.max - value.min;
+        sdl2::rect::Rect::new(
+            value.min.x.floor() as i32,
+            value.min.y.floor() as i32,
+            size.x.floor() as u32,
+            size.y.floor() as u32,
+        )
     }
 }
 
@@ -88,11 +101,9 @@ impl Platform for SDLPlatform {
         &mut self,
         handle: &Handle,
         color: Color,
-        pos: Vec2,
-        size: Vec2,
-        uv_offset: Vec2,
-        uv_size: Option<Vec2>,
-        angle: f32,
+        src: Option<Rect>,
+        dst: Rect,
+        angle: Option<f32>,
         flip_x: bool,
         flip_y: bool,
     ) {
@@ -100,29 +111,22 @@ impl Platform for SDLPlatform {
             log::debug!("Failed to get texture {}", handle.id());
             return;
         };
-        let uv_size = uv_size.unwrap_or_else(|| {
-            let q = texture.query();
-            Vec2::new(q.width as f32, q.height as f32)
-        });
 
-        let src = sdl2::rect::Rect::new(
-            uv_offset.x.floor() as i32,
-            uv_offset.y.floor() as i32,
-            uv_size.x.floor() as u32,
-            uv_size.y.floor() as u32,
-        );
-        let dst = sdl2::rect::Rect::new(
-            pos.x.floor() as i32,
-            pos.y.floor() as i32,
-            size.x.floor() as u32,
-            size.y.floor() as u32,
-        );
-
+        let src: Option<sdl2::rect::Rect> = src.map(Into::into);
+        let dst: sdl2::rect::Rect = dst.into();
         texture.set_color_mod(color.r, color.g, color.b);
 
         self.screen_buffer
             .canvas
-            .copy_ex(texture, src, dst, angle.into(), None, flip_x, flip_y)
+            .copy_ex(
+                texture,
+                src,
+                dst,
+                angle.unwrap_or_default().into(),
+                None,
+                flip_x,
+                flip_y,
+            )
             .unwrap();
     }
 

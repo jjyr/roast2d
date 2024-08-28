@@ -71,9 +71,10 @@ impl Camera {
     ) {
         if let Some(follow) = follow {
             let follow = follow.borrow();
+            let follow_size = follow.scaled_size();
             let size = Vec2::new(
-                follow.size.x.min(self.deadzone.x),
-                follow.size.y.min(self.deadzone.y),
+                follow_size.x.min(self.deadzone.x),
+                follow_size.y.min(self.deadzone.y),
             );
             if follow.pos.x < self.deadzone_pos.x {
                 self.deadzone_pos.x = follow.pos.x;
@@ -92,7 +93,7 @@ impl Camera {
             }
 
             if self.snap_to_platform && follow.on_ground {
-                self.deadzone_pos.y = follow.pos.y + follow.size.y - self.deadzone.y;
+                self.deadzone_pos.y = follow.pos.y + follow_size.y - self.deadzone.y;
             }
 
             let deadzone_target = self.deadzone_pos + self.deadzone * 0.5;

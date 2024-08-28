@@ -21,6 +21,7 @@ use crate::{
     engine::Engine,
     handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
+    types::Rect,
 };
 
 use super::Platform;
@@ -149,13 +150,11 @@ impl Platform for WebPlatform {
 
     fn draw(
         &mut self,
-        texture: &crate::handle::Handle,
-        color: crate::prelude::Color,
-        pos: glam::Vec2,
-        size: glam::Vec2,
-        uv_offset: glam::Vec2,
-        uv_size: Option<glam::Vec2>,
-        _angle: f32,
+        texture: &Handle,
+        color: Color,
+        src: Option<Rect>,
+        dst: Rect,
+        angle: Option<f32>,
         flip_x: bool,
         flip_y: bool,
     ) {
@@ -164,8 +163,16 @@ impl Platform for WebPlatform {
             return;
         };
         let canvas = texture.tint_color(color, &self.document);
-        let uv_size =
-            uv_size.unwrap_or_else(|| Vec2::new(canvas.width() as f32, canvas.height() as f32));
+        let uv_size = match src.as_ref() {
+            Some(src) => src.max - src.min,
+            None => Vec2::new(canvas.width() as f32, canvas.height() as f32),
+        };
+
+        let uv_offset = src.map(|src| src.min).unwrap_or_else(|| Vec2::ZERO);
+
+        let pos = dst.min;
+        let size = dst.max - dst.min;
+
         let mut dx = pos.x;
         let mut dy = pos.y;
         // flip
@@ -187,8 +194,20 @@ impl Platform for WebPlatform {
                 if flip_y { -1.0 } else { 1.0 },
             )
             .unwrap();
+
         let dw = (size.x as f64 * self.device_pixel_ratio).floor();
         let dh = (size.y as f64 * self.device_pixel_ratio).floor();
+
+        // rotate by center with angle degree in counter clock-wise
+        if let Some(angle) = angle {
+            let dw_hf = (dw * 0.5).floor();
+            let dh_hf = (dh * 0.5).floor();
+            // move to center
+            self.buf.translate(dw_hf, dh_hf).unwrap();
+            // rotate counter clockwise
+            self.buf.rotate((-angle as f64).to_radians()).unwrap();
+            self.buf.translate(-dw_hf, -dh_hf).unwrap();
+        }
         self.buf
             .draw_image_with_html_canvas_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                 &canvas,
