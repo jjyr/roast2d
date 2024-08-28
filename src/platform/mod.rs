@@ -1,10 +1,11 @@
 use anyhow::Result;
-use glam::{UVec2, Vec2};
+use glam::UVec2;
 
 use crate::{
     color::Color,
     engine::Engine,
     handle::{Handle, HandleId},
+    types::Rect,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -22,11 +23,9 @@ pub trait Platform {
         &mut self,
         texture: &Handle,
         color: Color,
-        pos: Vec2,
-        size: Vec2,
-        uv_offset: Vec2,
-        uv_size: Option<Vec2>,
-        angle: f32,
+        src: Option<Rect>,
+        dst: Rect,
+        angle: Option<f32>,
         flip_x: bool,
         flip_y: bool,
     );

@@ -215,8 +215,14 @@ impl Engine {
     }
 
     /// Draw image
-    pub fn draw_image(&mut self, image: &Sprite, pos: Vec2) {
-        self.render.draw_image(image, pos);
+    pub fn draw_image(
+        &mut self,
+        image: &Sprite,
+        pos: Vec2,
+        scale: Option<Vec2>,
+        angle: Option<f32>,
+    ) {
+        self.render.draw_image(image, pos, scale, angle);
     }
 
     /// Draw image as tile
@@ -226,11 +232,14 @@ impl Engine {
         tile: u16,
         tile_size: Vec2,
         dst_pos: Vec2,
+        scale: Option<Vec2>,
+        angle: Option<f32>,
         flip_x: bool,
         flip_y: bool,
     ) {
-        self.render
-            .draw_tile(image, tile, tile_size, dst_pos, flip_x, flip_y);
+        self.render.draw_tile(
+            image, tile, tile_size, dst_pos, scale, angle, flip_x, flip_y,
+        );
     }
 
     /// Sweep axis
@@ -410,7 +419,7 @@ impl Engine {
             if res {
                 let max_pos = {
                     let ent1 = ent1.borrow();
-                    sweep_axis.get(ent1.pos) + sweep_axis.get(ent1.size)
+                    sweep_axis.get(ent1.pos) + sweep_axis.get(ent1.scaled_size())
                 };
                 for j in (i + 1)..self.world.entities.len() {
                     let ent1 = self.world.entities[i].clone();

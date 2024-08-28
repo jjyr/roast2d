@@ -222,9 +222,7 @@ impl EntityType for Brick {
                 let size = BRICK_SIZE * scale;
                 let center_pos = self.dead_pos + BRICK_SIZE * 0.5;
                 ent.pos = center_pos - size * 0.5;
-                ent.size = size;
-
-                anim.sheet.scale = Vec2::splat(scale);
+                ent.scale = Vec2::splat(scale);
                 anim.sheet.color = color;
             }
         }
@@ -377,11 +375,11 @@ impl Scene for Demo {
     fn draw(&mut self, eng: &mut Engine) {
         eng.scene_base_draw();
         if let Some(text) = self.score_text.as_ref() {
-            eng.draw_image(text, Vec2::new(0.0, 0.0));
+            eng.draw_image(text, Vec2::new(0.0, 0.0), None, None);
         }
         if let Some(text) = self.fps_text.as_ref() {
             let x = eng.view_size().x - text.size().x as f32;
-            eng.draw_image(text, Vec2::new(x, 0.0));
+            eng.draw_image(text, Vec2::new(x, 0.0), None, None);
         }
     }
 }
