@@ -579,7 +579,10 @@ impl Engine {
                 }
                 LayerType::Entities => {
                     for ent in &layer.entity_instances {
-                        let pos = Vec2::new(ent.px.0 as f32, ent.px.1 as f32);
+                        let pos = Vec2::new(
+                            (ent.px.0 + ent.width / 2) as f32,
+                            (ent.px.1 + ent.height / 2) as f32,
+                        );
                         let ent_ref = self.spawn_with_type_name(ent.identifier.clone(), pos);
                         let settings = ent
                             .field_instances
