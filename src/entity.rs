@@ -12,7 +12,7 @@ use crate::{
     animation::Animation,
     engine::Engine,
     trace::{trace, Trace},
-    types::Mut,
+    types::{Mut, Rect},
 };
 
 /// Call with ent instance
@@ -181,16 +181,23 @@ impl Entity {
     }
 
     pub(crate) fn is_touching(&self, other: &Entity) -> bool {
-        let self_size = self.scaled_size();
-        let other_size = other.scaled_size();
-        !(self.pos.x >= other.pos.x + other_size.x
-            || self.pos.x + self_size.x <= other.pos.x
-            || self.pos.y >= other.pos.y + other_size.y
-            || self.pos.y + self_size.y <= other.pos.y)
+        let self_bound = self.bounds();
+        let other_bound = other.bounds();
+        !(self_bound.min.x >= other_bound.max.x
+            || self_bound.max.x <= other_bound.min.x
+            || self_bound.min.y >= other_bound.max.y
+            || self_bound.max.y <= other_bound.min.y)
     }
 
     pub fn scaled_size(&self) -> Vec2 {
         self.size * self.scale
+    }
+
+    pub fn bounds(&self) -> Rect {
+        let half_size = self.scaled_size() * 0.5;
+        let min = self.pos - half_size;
+        let max = self.pos + half_size;
+        Rect { min, max }
     }
 }
 
@@ -358,17 +365,17 @@ impl World {
 
 /// Resolve entity collision
 pub(crate) fn resolve_collision(eng: &mut Engine, a: &mut Entity, b: &mut Entity) {
-    let a_size = a.scaled_size();
-    let b_size = b.scaled_size();
-    let overlap_x: f32 = if a.pos.x < b.pos.x {
-        a.pos.x + a_size.x - b.pos.x
+    let a_bound = a.bounds();
+    let b_bound = b.bounds();
+    let overlap_x: f32 = if a_bound.min.x < b_bound.min.x {
+        a_bound.max.x - b_bound.min.x
     } else {
-        b.pos.x + b_size.x - a.pos.x
+        b_bound.max.x - a_bound.min.x
     };
-    let overlap_y: f32 = if a.pos.y < b.pos.y {
-        a.pos.y + a_size.y - b.pos.y
+    let overlap_y: f32 = if a_bound.min.y < b_bound.min.y {
+        a_bound.max.y - b_bound.min.y
     } else {
-        b.pos.y + b_size.y - a.pos.y
+        b_bound.max.y - a_bound.min.y
     };
 
     let a_move;
@@ -390,9 +397,8 @@ pub(crate) fn resolve_collision(eng: &mut Engine, a: &mut Entity, b: &mut Entity
     }
 
     if overlap_y > overlap_x {
-        if a.pos.x < b.pos.x {
+        if a_bound.min.x < b_bound.min.x {
             entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
-
             eng.collide(a, Vec2::new(-1.0, 0.0), None);
             eng.collide(b, Vec2::new(1.0, 0.0), None);
         } else {
@@ -400,7 +406,7 @@ pub(crate) fn resolve_collision(eng: &mut Engine, a: &mut Entity, b: &mut Entity
             eng.collide(a, Vec2::new(1.0, 0.0), None);
             eng.collide(b, Vec2::new(-1.0, 0.0), None);
         }
-    } else if a.pos.y < b.pos.y {
+    } else if a_bound.min.y < b_bound.min.y {
         entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
         eng.collide(a, Vec2::new(0.0, -1.0), None);
         eng.collide(b, Vec2::new(0.0, 1.0), None);

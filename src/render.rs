@@ -89,13 +89,14 @@ impl Render {
         scale: Option<Vec2>,
         angle: Option<f32>,
     ) {
-        let dst_size = scale
+        let half_size = scale
             .map(|s| image.sizef() * s)
-            .unwrap_or_else(|| image.sizef());
+            .unwrap_or_else(|| image.sizef())
+            * 0.5;
 
         let dst = Rect {
-            min: pos,
-            max: pos + dst_size,
+            min: pos - half_size,
+            max: pos + half_size,
         };
         self.draw(
             &image.texture,

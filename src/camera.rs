@@ -2,7 +2,7 @@ use glam::Vec2;
 
 use crate::{
     entity::{Entity, EntityRef},
-    types::Mut,
+    types::{Mut, Rect},
 };
 
 #[derive(Default)]
@@ -76,24 +76,29 @@ impl Camera {
                 follow_size.x.min(self.deadzone.x),
                 follow_size.y.min(self.deadzone.y),
             );
-            if follow.pos.x < self.deadzone_pos.x {
-                self.deadzone_pos.x = follow.pos.x;
+            let half_size = size * 0.5;
+            let follow_rect = Rect {
+                min: follow.pos - half_size,
+                max: follow.pos + half_size,
+            };
+            if follow_rect.min.x < self.deadzone_pos.x {
+                self.deadzone_pos.x = follow_rect.min.x;
                 self.look_ahead_target.x = -self.look_ahead.x
-            } else if follow.pos.x + size.x > self.deadzone_pos.x + self.deadzone.x {
-                self.deadzone_pos.x = follow.pos.x + size.x - self.deadzone.x;
+            } else if follow_rect.max.x > self.deadzone_pos.x + self.deadzone.x {
+                self.deadzone_pos.x = follow_rect.max.x - self.deadzone.x;
                 self.look_ahead_target.x = self.look_ahead.x;
             }
 
-            if follow.pos.y < self.deadzone_pos.y {
-                self.deadzone_pos.y = follow.pos.y;
+            if follow_rect.min.y < self.deadzone_pos.y {
+                self.deadzone_pos.y = follow_rect.min.y;
                 self.look_ahead_target.y = -self.look_ahead.y;
-            } else if follow.pos.y + size.y > self.deadzone_pos.y + self.deadzone.y {
-                self.deadzone_pos.y = follow.pos.y + size.y - self.deadzone.y;
+            } else if follow_rect.max.y > self.deadzone_pos.y + self.deadzone.y {
+                self.deadzone_pos.y = follow_rect.max.y - self.deadzone.y;
                 self.look_ahead_target.y = self.look_ahead.y;
             }
 
             if self.snap_to_platform && follow.on_ground {
-                self.deadzone_pos.y = follow.pos.y + follow_size.y - self.deadzone.y;
+                self.deadzone_pos.y = follow_rect.max.y - self.deadzone.y;
             }
 
             let deadzone_target = self.deadzone_pos + self.deadzone * 0.5;

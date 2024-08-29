@@ -403,7 +403,7 @@ impl Engine {
         // insertion sort can gain better performance since list is sorted in every frames
         let sweep_axis = self.sweep_axis;
         insertion_sort_by_key(&mut self.world.entities, |ent| {
-            sweep_axis.get(ent.borrow().pos) as usize
+            sweep_axis.get(ent.borrow().bounds().min) as usize
         });
 
         // Sweep touches
@@ -419,12 +419,12 @@ impl Engine {
             if res {
                 let max_pos = {
                     let ent1 = ent1.borrow();
-                    sweep_axis.get(ent1.pos) + sweep_axis.get(ent1.scaled_size())
+                    sweep_axis.get(ent1.bounds().max)
                 };
                 for j in (i + 1)..self.world.entities.len() {
                     let ent1 = self.world.entities[i].clone();
                     let ent2 = self.world.entities[j].clone();
-                    if sweep_axis.get(ent2.borrow().pos) > max_pos {
+                    if sweep_axis.get(ent2.borrow().bounds().min) > max_pos {
                         break;
                     }
                     self.perf.checks += 1;

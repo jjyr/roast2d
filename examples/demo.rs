@@ -88,20 +88,22 @@ impl EntityType for Ball {
 
     fn post_update(&mut self, eng: &mut Engine, ent: &mut Entity) {
         let view = eng.view_size();
-        if ent.pos.x < -ent.size.x {
-            ent.pos.x = 0.0;
+        let half_size = ent.size * 0.5;
+        let bounds = ent.bounds();
+        if bounds.max.x < 0.0 {
+            ent.pos.x = half_size.x;
             ent.vel.x = BALL_MAX_VEL;
         }
-        if ent.pos.x > view.x {
-            ent.pos.x = view.x - ent.size.x;
+        if bounds.min.x > view.x {
+            ent.pos.x = view.x - half_size.x;
             ent.vel.x = -BALL_MAX_VEL;
         }
-        if ent.pos.y < -ent.size.x {
-            ent.pos.y = 0.0;
+        if bounds.max.y < 0.0 {
+            ent.pos.y = half_size.y;
             ent.vel.y = BALL_MAX_VEL;
         }
-        if ent.pos.y > view.y {
-            ent.pos.y = view.y - ent.size.y;
+        if bounds.min.y > view.y {
+            ent.pos.y = view.y - half_size.y;
             ent.vel.y = -BALL_MAX_VEL;
         }
     }
@@ -219,9 +221,6 @@ impl EntityType for Brick {
                     let end = start * 0.5;
                     start - (start - end) * progress
                 };
-                let size = BRICK_SIZE * scale;
-                let center_pos = self.dead_pos + BRICK_SIZE * 0.5;
-                ent.pos = center_pos - size * 0.5;
                 ent.scale = Vec2::splat(scale);
                 anim.sheet.color = color;
             }
@@ -321,13 +320,16 @@ impl Scene for Demo {
             log::error!("Failed to load font from {font_path}");
         }
 
-        eng.spawn::<Player>(Vec2::new(40.0, view.y - 32.0));
+        eng.spawn::<Player>(Vec2::new(108.0, view.y - 8.0));
         eng.spawn::<Ball>(Vec2::new(40.0, view.y - 64.0));
 
-        eng.spawn::<LeftWall>(Vec2::new(-WALL_THICK, 0.0));
-        eng.spawn::<RightWall>(Vec2::new(view.x, 0.0));
-        eng.spawn::<TopWall>(Vec2::new(0.0, -WALL_THICK));
-        eng.spawn::<BottomWall>(Vec2::new(0.0, view.y));
+        eng.spawn::<LeftWall>(Vec2::new(-WALL_THICK * 0.5, view.y * 0.5));
+        eng.spawn::<RightWall>(Vec2::new(view.x + WALL_THICK * 0.5, view.y * 0.5));
+        eng.spawn::<TopWall>(Vec2::new(view.x * 0.5, -WALL_THICK * 0.5));
+        eng.spawn::<BottomWall>(Vec2::new(
+            eng.view_size().x * 0.5,
+            view.y + WALL_THICK * 0.5,
+        ));
 
         let padding = 5.;
         let row_gap = 5.;
@@ -338,8 +340,8 @@ impl Scene for Demo {
         for i in 0..cols {
             for j in 0..rows {
                 eng.spawn::<Brick>(Vec2::new(
-                    i as f32 * (BRICK_SIZE.x + padding) + offset_x,
-                    j as f32 * (BRICK_SIZE.y + row_gap),
+                    (i as f32 + 0.5) * (BRICK_SIZE.x + padding) + offset_x,
+                    (j as f32 + 0.5) * (BRICK_SIZE.y + row_gap),
                 ));
             }
         }
@@ -375,11 +377,11 @@ impl Scene for Demo {
     fn draw(&mut self, eng: &mut Engine) {
         eng.scene_base_draw();
         if let Some(text) = self.score_text.as_ref() {
-            eng.draw_image(text, Vec2::new(0.0, 0.0), None, None);
+            eng.draw_image(text, text.sizef() * 0.5, None, None);
         }
         if let Some(text) = self.fps_text.as_ref() {
-            let x = eng.view_size().x - text.size().x as f32;
-            eng.draw_image(text, Vec2::new(x, 0.0), None, None);
+            let x = eng.view_size().x - (text.size().x as f32 * 0.5);
+            eng.draw_image(text, Vec2::new(x, text.sizef().y * 0.5), None, None);
         }
     }
 }
