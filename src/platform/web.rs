@@ -184,8 +184,8 @@ impl Platform for WebPlatform {
         }
         self.buf
             .translate(
-                (dx as f64 * self.device_pixel_ratio).floor(),
-                (dy as f64 * self.device_pixel_ratio).floor(),
+                ((dx as f64).round() * self.device_pixel_ratio).ceil(),
+                ((dy as f64).round() * self.device_pixel_ratio).ceil(),
             )
             .unwrap();
         self.buf
@@ -195,13 +195,13 @@ impl Platform for WebPlatform {
             )
             .unwrap();
 
-        let dw = (size.x as f64 * self.device_pixel_ratio).floor();
-        let dh = (size.y as f64 * self.device_pixel_ratio).floor();
+        let dw = ((size.x as f64).round() * self.device_pixel_ratio).ceil();
+        let dh = ((size.y as f64).round() * self.device_pixel_ratio).ceil();
 
         // rotate by center with angle degree in counter clock-wise
         if let Some(angle) = angle {
-            let dw_hf = (dw * 0.5).floor();
-            let dh_hf = (dh * 0.5).floor();
+            let dw_hf = (dw * 0.5).round();
+            let dh_hf = (dh * 0.5).round();
             // move to center
             self.buf.translate(dw_hf, dh_hf).unwrap();
             // rotate counter clockwise
@@ -211,10 +211,10 @@ impl Platform for WebPlatform {
         self.buf
             .draw_image_with_html_canvas_element_and_sw_and_sh_and_dx_and_dy_and_dw_and_dh(
                 &canvas,
-                uv_offset.x.floor().into(),
-                uv_offset.y.floor().into(),
-                uv_size.x.floor().into(),
-                uv_size.y.floor().into(),
+                uv_offset.x.round().into(),
+                uv_offset.y.round().into(),
+                uv_size.x.round().into(),
+                uv_size.y.round().into(),
                 0.0,
                 0.0,
                 dw,
