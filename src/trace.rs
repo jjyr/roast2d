@@ -33,7 +33,9 @@ impl Default for Trace {
     }
 }
 
-pub(crate) fn trace(map: &CollisionMap, from: Vec2, vel: Vec2, size: Vec2) -> Trace {
+pub(crate) fn trace(map: &CollisionMap, from_center: Vec2, vel: Vec2, size: Vec2) -> Trace {
+    let half_size = size * 0.5;
+    let from = from_center - half_size;
     let to = from + vel;
     let mut res = Trace {
         pos: to,
@@ -48,6 +50,7 @@ pub(crate) fn trace(map: &CollisionMap, from: Vec2, vel: Vec2, size: Vec2) -> Tr
         || (from.y > map_size.y && to.y > map_size.y)
         || (vel.x == 0. && vel.y == 0.)
     {
+        res.pos += half_size;
         return res;
     }
     let offset = Vec2::new(
@@ -61,6 +64,7 @@ pub(crate) fn trace(map: &CollisionMap, from: Vec2, vel: Vec2, size: Vec2) -> Tr
     let steps = (max_vel / map.tile_size).ceil();
 
     if steps == 0.0 {
+        res.pos += half_size;
         return res;
     }
 
@@ -135,11 +139,13 @@ pub(crate) fn trace(map: &CollisionMap, from: Vec2, vel: Vec2, size: Vec2) -> Tr
         // earlier .length point. For fully solid tiles (id: 1), we can
         // return here.
         if res.tile > 0 && (res.tile == 1 || extra_step_for_slope) {
+            res.pos += half_size;
             return res;
         }
         extra_step_for_slope = true;
     }
 
+    res.pos += half_size;
     res
 }
 
