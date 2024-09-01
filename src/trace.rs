@@ -157,9 +157,7 @@ fn check_tile(
     tile_pos: IVec2,
     res: &mut Trace,
 ) {
-    let tile = map.get(tile_pos).unwrap_or_default();
-    if tile == 0 {
-    } else {
+    if map.is_collide(tile_pos) {
         resolve_full_tile(map, pos, vel, size, tile_pos, res);
     }
 }
