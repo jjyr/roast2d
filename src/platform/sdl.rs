@@ -58,10 +58,10 @@ impl From<Rect> for sdl2::rect::Rect {
     fn from(value: Rect) -> Self {
         let size = value.max - value.min;
         sdl2::rect::Rect::new(
-            value.min.x.round() as i32,
-            value.min.y.round() as i32,
-            size.x.round() as u32,
-            size.y.round() as u32,
+            value.min.x.floor() as i32,
+            value.min.y.floor() as i32,
+            size.x.ceil() as u32,
+            size.y.ceil() as u32,
         )
     }
 }
