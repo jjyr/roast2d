@@ -183,10 +183,10 @@ impl Entity {
     pub(crate) fn is_touching(&self, other: &Entity) -> bool {
         let self_bound = self.bounds();
         let other_bound = other.bounds();
-        !(self_bound.min.x >= other_bound.max.x
-            || self_bound.max.x <= other_bound.min.x
-            || self_bound.min.y >= other_bound.max.y
-            || self_bound.max.y <= other_bound.min.y)
+        !(self_bound.min.x > other_bound.max.x
+            || self_bound.max.x < other_bound.min.x
+            || self_bound.min.y > other_bound.max.y
+            || self_bound.max.y < other_bound.min.y)
     }
 
     pub fn scaled_size(&self) -> Vec2 {

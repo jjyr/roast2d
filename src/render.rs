@@ -130,7 +130,7 @@ impl Render {
             row as f32 * (tile_size.y + image.spacing) + image.padding,
         );
         let src_size = Vec2::new(tile_size.x, tile_size.y);
-        let dst_size = scale.map(|s| s * src_size).unwrap_or_else(|| src_size);
+        let half_dst_size = scale.map(|s| s * src_size).unwrap_or_else(|| src_size) * 0.5;
 
         // color
         let flip_x = flip_x || image.flip_x;
@@ -141,8 +141,8 @@ impl Render {
             max: src_pos + src_size,
         };
         let dst = Rect {
-            min: dst_pos,
-            max: dst_pos + dst_size,
+            min: dst_pos - half_dst_size,
+            max: dst_pos + half_dst_size,
         };
         self.draw(
             &image.texture,

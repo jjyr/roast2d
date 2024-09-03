@@ -578,13 +578,18 @@ impl Engine {
                     self.background_maps.push(map);
                 }
                 LayerType::Entities => {
-                    for ent in &layer.entity_instances {
+                    for ent_ins in &layer.entity_instances {
                         let pos = Vec2::new(
-                            (ent.px.0 + ent.width / 2) as f32,
-                            (ent.px.1 + ent.height / 2) as f32,
+                            (ent_ins.px.0 + ent_ins.width / 2) as f32,
+                            (ent_ins.px.1 + ent_ins.height / 2) as f32,
                         );
-                        let ent_ref = self.spawn_with_type_name(ent.identifier.clone(), pos);
-                        let settings = ent
+                        let ent_ref = self.spawn_with_type_name(ent_ins.identifier.clone(), pos);
+                        if let Some(ent) = self.world_mut().get(ent_ref) {
+                            let mut ent = ent.borrow_mut();
+                            ent.size.x = ent_ins.width as f32;
+                            ent.size.y = ent_ins.height as f32;
+                        }
+                        let settings = ent_ins
                             .field_instances
                             .iter()
                             .map(|f| (f.identifier.clone(), f.value.clone()))
