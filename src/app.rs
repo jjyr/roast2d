@@ -48,10 +48,4 @@ impl App {
         } = self;
         platform_run(title, width, height, vsync, setup).await
     }
-
-    /// Run the game
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn run_block<Setup: FnOnce(&mut Engine)>(self, setup: Setup) -> Result<()> {
-        futures_lite::future::block_on(self.run(setup))
-    }
 }

@@ -406,13 +406,15 @@ fn setup(eng: &mut Engine) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() {
+#[pollster::main]
+async fn main() {
     env_logger::init();
     App::default()
         .title("Hello Roast2D".to_string())
         .window(UVec2::new(800, 600))
         .vsync(true)
-        .run_block(setup)
+        .run(setup)
+        .await
         .expect("Start game");
 }
 

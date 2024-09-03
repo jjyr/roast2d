@@ -31,7 +31,6 @@ serde_json = "1.0.124"
 
 # Non-Wasm32 target
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-futures-lite = "2.3"
 sdl2 = {version = "0.37.0", features = ["unsafe_textures"]}
 
 # Wasm32 target
@@ -64,6 +63,7 @@ too_many_arguments = "allow"
 
 [dev-dependencies]
 env_logger = "0.11"
+pollster = { version = "0.3.0", features = ["macro"] }
 rand = "0.8.5"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

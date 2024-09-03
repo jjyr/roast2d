@@ -47,7 +47,7 @@ impl Default for CollisionMap {
             size: UVec2::default(),
             tile_size: 0.0,
             data: Default::default(),
-            collision_rule: Box::new(DefaultCollisionRule::default()),
+            collision_rule: Box::new(DefaultCollisionRule),
         }
     }
 }
