@@ -2,7 +2,7 @@ use glam::{IVec2, Vec2};
 
 use crate::prelude::CollisionMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Trace {
     // The tile that was hit. 0 if no hit.
     pub tile: i32,

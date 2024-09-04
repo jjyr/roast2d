@@ -1,8 +1,9 @@
 use std::any::Any;
 
+use glam::Vec2;
 use serde_json::Value;
 
-use crate::entity::EntityRef;
+use crate::{entity::EntRef, trace::Trace};
 
 #[derive(Default)]
 pub(crate) struct Commands {
@@ -20,25 +21,29 @@ impl Commands {
 }
 
 pub(crate) enum Command {
+    Collide {
+        ent: EntRef,
+        normal: Vec2,
+        trace: Option<Trace>,
+    },
     Setting {
-        ent: EntityRef,
+        ent: EntRef,
         settings: Value,
     },
     KillEntity {
-        ent: EntityRef,
+        ent: EntRef,
     },
     Damage {
-        ent: EntityRef,
-        by_ent: EntityRef,
+        ent: EntRef,
+        by_ent: EntRef,
         damage: f32,
     },
     Trigger {
-        ent: EntityRef,
-        other: EntityRef,
+        ent: EntRef,
+        other: EntRef,
     },
     Message {
-        ent: EntityRef,
-        msg_id: u32,
+        ent: EntRef,
         data: Box<dyn Any>,
     },
 }

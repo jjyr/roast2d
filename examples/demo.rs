@@ -50,7 +50,7 @@ pub struct Ball {
     anim: Animation,
 }
 
-impl EntityType for Ball {
+impl EntType for Ball {
     fn load(eng: &mut Engine) -> Self {
         let size = Vec2::new(32., 32.0);
         let mut sheet = Sprite::with_sizef(load_texture(eng), size);
@@ -59,109 +59,125 @@ impl EntityType for Ball {
         Ball { size, anim }
     }
 
-    fn init(&mut self, _eng: &mut Engine, ent: &mut Entity) {
-        ent.size = self.size;
-        ent.anim = Some(self.anim.clone());
-        ent.group = EntityGroup::PROJECTILE;
-        ent.accel.y = -BALL_ACCEL * 2.0;
-        ent.friction = Vec2::splat(0.1);
-        ent.physics = EntityPhysics::LITE;
-        ent.restitution = 12.0;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|_, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.size = self.size;
+            ent.anim = Some(self.anim.clone());
+            ent.group = EntityGroup::PROJECTILE;
+            ent.accel.y = -BALL_ACCEL * 2.0;
+            ent.friction = Vec2::splat(0.1);
+            ent.physics = EntPhysics::LITE;
+            ent.restitution = 12.0;
+        });
     }
 
-    fn collide(
-        &mut self,
-        _eng: &mut Engine,
-        ent: &mut Entity,
-        normal: Vec2,
-        _trace: Option<&Trace>,
-    ) {
-        if normal.y != 0.0 {
-            ent.vel.y = normal.y * BALL_MAX_VEL;
-            ent.accel.y = normal.y * BALL_ACCEL;
-        }
-        if normal.x != 0.0 {
-            ent.vel.x = normal.x * BALL_MAX_VEL;
-            ent.accel.x = normal.x * BALL_ACCEL;
-        }
+    fn collide(&mut self, eng: &mut Engine, ent: EntRef, normal: Vec2, _trace: Option<&Trace>) {
+        eng.with_world(|_eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+
+            if normal.y != 0.0 {
+                ent.vel.y = normal.y * BALL_MAX_VEL;
+                ent.accel.y = normal.y * BALL_ACCEL;
+            }
+            if normal.x != 0.0 {
+                ent.vel.x = normal.x * BALL_MAX_VEL;
+                ent.accel.x = normal.x * BALL_ACCEL;
+            }
+        });
     }
 
-    fn post_update(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        let view = eng.view_size();
-        let half_size = ent.size * 0.5;
-        let bounds = ent.bounds();
-        if bounds.max.x < 0.0 {
-            ent.pos.x = half_size.x;
-            ent.vel.x = BALL_MAX_VEL;
-        }
-        if bounds.min.x > view.x {
-            ent.pos.x = view.x - half_size.x;
-            ent.vel.x = -BALL_MAX_VEL;
-        }
-        if bounds.max.y < 0.0 {
-            ent.pos.y = half_size.y;
-            ent.vel.y = BALL_MAX_VEL;
-        }
-        if bounds.min.y > view.y {
-            ent.pos.y = view.y - half_size.y;
-            ent.vel.y = -BALL_MAX_VEL;
-        }
+    fn post_update(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            let view = eng.view_size();
+            let half_size = ent.size * 0.5;
+            let bounds = ent.bounds();
+            if bounds.max.x < 0.0 {
+                ent.pos.x = half_size.x;
+                ent.vel.x = BALL_MAX_VEL;
+            }
+            if bounds.min.x > view.x {
+                ent.pos.x = view.x - half_size.x;
+                ent.vel.x = -BALL_MAX_VEL;
+            }
+            if bounds.max.y < 0.0 {
+                ent.pos.y = half_size.y;
+                ent.vel.y = BALL_MAX_VEL;
+            }
+            if bounds.min.y > view.y {
+                ent.pos.y = view.y - half_size.y;
+                ent.vel.y = -BALL_MAX_VEL;
+            }
+        });
     }
 }
 
 #[derive(Clone)]
 pub struct LeftWall;
 
-impl EntityType for LeftWall {
+impl EntType for LeftWall {
     fn load(_eng: &mut Engine) -> Self {
         Self
     }
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        ent.size = Vec2::new(WALL_THICK, eng.view_size().y);
-        ent.check_against = EntityGroup::PROJECTILE;
-        ent.physics = EntityPhysics::FIXED;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.size = Vec2::new(WALL_THICK, eng.view_size().y);
+            ent.check_against = EntityGroup::PROJECTILE;
+            ent.physics = EntPhysics::FIXED;
+        });
     }
 }
 
 #[derive(Clone)]
 pub struct RightWall;
 
-impl EntityType for RightWall {
+impl EntType for RightWall {
     fn load(_eng: &mut Engine) -> Self {
         Self
     }
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        ent.size = Vec2::new(WALL_THICK, eng.view_size().y);
-        ent.check_against = EntityGroup::PROJECTILE;
-        ent.physics = EntityPhysics::FIXED;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.size = Vec2::new(WALL_THICK, eng.view_size().y);
+            ent.check_against = EntityGroup::PROJECTILE;
+            ent.physics = EntPhysics::FIXED;
+        });
     }
 }
 
 #[derive(Clone)]
 pub struct TopWall;
 
-impl EntityType for TopWall {
+impl EntType for TopWall {
     fn load(_eng: &mut Engine) -> Self {
         Self
     }
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        ent.size = Vec2::new(eng.view_size().x, WALL_THICK);
-        ent.check_against = EntityGroup::PROJECTILE;
-        ent.physics = EntityPhysics::FIXED;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.size = Vec2::new(eng.view_size().x, WALL_THICK);
+            ent.check_against = EntityGroup::PROJECTILE;
+            ent.physics = EntPhysics::FIXED;
+        });
     }
 }
 
 #[derive(Clone)]
 pub struct BottomWall;
 
-impl EntityType for BottomWall {
+impl EntType for BottomWall {
     fn load(_eng: &mut Engine) -> Self {
         Self
     }
-    fn init(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        ent.size = Vec2::new(eng.view_size().x, WALL_THICK);
-        ent.check_against = EntityGroup::PROJECTILE;
-        ent.physics = EntityPhysics::FIXED;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.size = Vec2::new(eng.view_size().x, WALL_THICK);
+            ent.check_against = EntityGroup::PROJECTILE;
+            ent.physics = EntPhysics::FIXED;
+        });
     }
 }
 
@@ -173,7 +189,7 @@ pub struct Brick {
     anim: Animation,
 }
 
-impl EntityType for Brick {
+impl EntType for Brick {
     fn load(eng: &mut Engine) -> Self {
         let mut sheet = Sprite::with_sizef(load_texture(eng), BRICK_SIZE);
         sheet.color = Color::rgb(0x5b, 0x6e, 0xe1);
@@ -186,51 +202,57 @@ impl EntityType for Brick {
         }
     }
 
-    fn init(&mut self, _eng: &mut Engine, ent: &mut Entity) {
-        ent.anim = Some(self.anim.clone());
-        ent.size = BRICK_SIZE;
-        ent.check_against = EntityGroup::PROJECTILE;
-        ent.physics = EntityPhysics::ACTIVE;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|_, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.anim = Some(self.anim.clone());
+            ent.size = BRICK_SIZE;
+            ent.check_against = EntityGroup::PROJECTILE;
+            ent.physics = EntPhysics::ACTIVE;
+        });
     }
 
-    fn kill(&mut self, _eng: &mut Engine, _ent: &mut Entity) {
+    fn kill(&mut self, _eng: &mut Engine, _ent: EntRef) {
         G.with_borrow_mut(|g| {
             g.score += 1;
         });
     }
 
-    fn update(&mut self, eng: &mut Engine, ent: &mut Entity) {
+    fn update(&mut self, eng: &mut Engine, ent: EntRef) {
         if self.hit {
             self.dying += eng.tick;
             if self.dying > BRICK_DYING {
-                eng.kill(ent.ent_ref);
+                eng.kill(ent);
             }
 
-            if let Some(anim) = ent.anim.as_mut() {
-                let progress = (self.dying / BRICK_DYING).powi(2);
-                let color = {
-                    let (r1, g1, b1): (u8, u8, u8) = (0x5b, 0x6e, 0xe1);
-                    let (r2, g2, b2) = (RED.r, RED.g, RED.b);
-                    let r = r1.saturating_add(((r1 as f32 - r2 as f32) * progress).abs() as u8);
-                    let g = g1.saturating_add(((g1 as f32 - g2 as f32) * progress).abs() as u8);
-                    let b = b1.saturating_add(((b1 as f32 - b2 as f32) * progress).abs() as u8);
-                    Color::rgb(r, g, b)
-                };
-                let scale = {
-                    let start = 1.0;
-                    let end = start * 0.5;
-                    start - (start - end) * progress
-                };
+            let progress = (self.dying / BRICK_DYING).powi(2);
+            let color = {
+                let (r1, g1, b1): (u8, u8, u8) = (0x5b, 0x6e, 0xe1);
+                let (r2, g2, b2) = (RED.r, RED.g, RED.b);
+                let r = r1.saturating_add(((r1 as f32 - r2 as f32) * progress).abs() as u8);
+                let g = g1.saturating_add(((g1 as f32 - g2 as f32) * progress).abs() as u8);
+                let b = b1.saturating_add(((b1 as f32 - b2 as f32) * progress).abs() as u8);
+                Color::rgb(r, g, b)
+            };
+            let scale = {
+                let start = 1.0;
+                let end = start * 0.5;
+                start - (start - end) * progress
+            };
+            eng.with_world(|_, mut w| {
+                let ent = w.get_mut(ent).unwrap();
                 ent.scale = Vec2::splat(scale);
-                anim.sheet.color = color;
-            }
+                if let Some(anim) = ent.anim.as_mut() {
+                    anim.sheet.color = color;
+                }
+            });
         }
     }
 
-    fn touch(&mut self, _eng: &mut Engine, ent: &mut Entity, _other: &mut Entity) {
+    fn touch(&mut self, eng: &mut Engine, ent: EntRef, _other: EntRef) {
         if !self.hit {
             self.hit = true;
-            self.dead_pos = ent.pos;
+            self.dead_pos = eng.with_world(|_, w| w.get(ent).unwrap().pos);
         }
     }
 }
@@ -241,7 +263,7 @@ pub struct Player {
     anim: Animation,
 }
 
-impl EntityType for Player {
+impl EntType for Player {
     fn load(eng: &mut Engine) -> Self {
         let size = Vec2::new(128.0, 48.0);
         let mut sheet = Sprite::with_sizef(load_texture(eng), size);
@@ -251,31 +273,43 @@ impl EntityType for Player {
         Self { size, anim }
     }
 
-    fn init(&mut self, _eng: &mut Engine, ent: &mut Entity) {
-        ent.size = self.size;
-        ent.anim = Some(self.anim.clone());
-        ent.friction = Vec2::splat(FRICTION);
-        ent.check_against = EntityGroup::PROJECTILE;
-        ent.physics = EntityPhysics::ACTIVE;
+    fn init(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|_, mut w| {
+            let ent = w.get_mut(ent).unwrap();
+            ent.size = self.size;
+            ent.anim = Some(self.anim.clone());
+            ent.friction = Vec2::splat(FRICTION);
+            ent.check_against = EntityGroup::PROJECTILE;
+            ent.physics = EntPhysics::ACTIVE;
+        });
     }
 
-    fn update(&mut self, eng: &mut Engine, ent: &mut Entity) {
-        let input = eng.input();
+    fn update(&mut self, eng: &mut Engine, ent: EntRef) {
+        eng.with_world(|eng, mut w| {
+            let ent = w.get_mut(ent).unwrap();
 
-        ent.accel = Vec2::default();
-        if input.pressed(Action::Right) {
-            ent.vel.x = PLAYER_VEL;
-        }
-        if input.pressed(Action::Left) {
-            ent.vel.x = -PLAYER_VEL;
-        }
+            let input = eng.input();
+
+            ent.accel = Vec2::default();
+            if input.pressed(Action::Right) {
+                ent.vel.x = PLAYER_VEL;
+            }
+            if input.pressed(Action::Left) {
+                ent.vel.x = -PLAYER_VEL;
+            }
+        });
     }
 
-    fn touch(&mut self, _eng: &mut Engine, ent: &mut Entity, other: &mut Entity) {
-        if other.ent_type.is::<Ball>() {
-            other.vel.x = (other.vel.x * 0.5 + ent.vel.x).clamp(-BALL_MAX_VEL, BALL_MAX_VEL);
-            other.accel.x = other.vel.normalize().x * other.accel.x.abs();
-        }
+    fn touch(&mut self, eng: &mut Engine, ent: EntRef, other: EntRef) {
+        eng.with_world(|_, mut w| {
+            let [Some(ent), Some(other)] = w.get_many_mut([ent, other]) else {
+                return;
+            };
+            if other.ent_type.is::<Ball>() {
+                other.vel.x = (other.vel.x * 0.5 + ent.vel.x).clamp(-BALL_MAX_VEL, BALL_MAX_VEL);
+                other.accel.x = other.vel.normalize().x * other.accel.x.abs();
+            }
+        });
     }
 }
 
@@ -395,13 +429,13 @@ fn setup(eng: &mut Engine) {
         height: true,
     });
     eng.set_sweep_axis(SweepAxis::Y);
-    eng.add_entity_type::<Player>();
-    eng.add_entity_type::<LeftWall>();
-    eng.add_entity_type::<RightWall>();
-    eng.add_entity_type::<TopWall>();
-    eng.add_entity_type::<BottomWall>();
-    eng.add_entity_type::<Ball>();
-    eng.add_entity_type::<Brick>();
+    eng.add_ent_type::<Player>();
+    eng.add_ent_type::<LeftWall>();
+    eng.add_ent_type::<RightWall>();
+    eng.add_ent_type::<TopWall>();
+    eng.add_ent_type::<BottomWall>();
+    eng.add_ent_type::<Ball>();
+    eng.add_ent_type::<Brick>();
     eng.set_scene(Demo::default());
 }
 

@@ -1,8 +1,8 @@
 use glam::Vec2;
 
 use crate::{
-    entity::{Entity, EntityRef},
-    types::{Mut, Rect},
+    entity::{Ent, EntRef},
+    types::Rect,
 };
 
 #[derive(Default)]
@@ -41,7 +41,7 @@ pub struct Camera {
     // Internal state
     deadzone_pos: Vec2,
     look_ahead_target: Vec2,
-    pub(crate) follow: Option<EntityRef>,
+    pub(crate) follow: Option<EntRef>,
     pos: Vec2,
     vel: Vec2,
     snap: bool,
@@ -66,11 +66,10 @@ impl Camera {
         &mut self,
         tick: f32,
         screen_size: Vec2,
-        follow: Option<Mut<Entity>>,
+        follow: Option<&Ent>,
         bounds: Option<Vec2>,
     ) {
         if let Some(follow) = follow {
-            let follow = follow.borrow();
             let follow_size = follow.scaled_size();
             let size = Vec2::new(
                 follow_size.x.min(self.deadzone.x),
@@ -124,7 +123,7 @@ impl Camera {
         self.pos = pos;
     }
 
-    pub fn follow(&mut self, entity_ref: EntityRef, snap: bool) {
+    pub fn follow(&mut self, entity_ref: EntRef, snap: bool) {
         self.follow.replace(entity_ref);
         self.snap = snap;
     }

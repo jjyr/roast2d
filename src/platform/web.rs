@@ -413,7 +413,7 @@ impl Platform for WebPlatform {
         setup(&mut engine);
         engine.init();
 
-        engine.render.resize(size);
+        engine.render.borrow_mut().resize(size);
 
         loop {
             if let Err(err) = engine.handle_assets().await {
@@ -421,9 +421,9 @@ impl Platform for WebPlatform {
             }
             // handle events
             handle_events(&mut engine, &mut events_receiver);
-            engine.platform_mut().prepare_frame();
+            engine.with_platform(|p| p.prepare_frame());
             engine.update();
-            engine.platform_mut().end_frame();
+            engine.with_platform(|p| p.end_frame());
             wait_next_frame().await.unwrap();
         }
     }

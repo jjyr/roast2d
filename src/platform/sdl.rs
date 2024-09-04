@@ -203,6 +203,7 @@ impl Platform for SDLPlatform {
         engine.init();
         engine
             .render
+            .borrow_mut()
             .resize(event_handler.window.drawable_size().into());
 
         while !event_handler.wants_to_exit {
@@ -212,13 +213,13 @@ impl Platform for SDLPlatform {
             event_handler
                 .pump_events(&mut engine)
                 .map_err(|err| anyhow!(err))?;
-            engine.platform_mut().prepare_frame();
+            engine.with_platform(|p| p.prepare_frame());
             engine.update();
-            engine.platform_mut().end_frame();
+            engine.with_platform(|p| p.end_frame());
         }
 
         engine.cleanup();
-        engine.platform_mut().cleanup();
+        engine.with_platform(|p| p.cleanup());
 
         Ok(())
     }
@@ -375,7 +376,7 @@ impl SDLEventHandler {
                         WindowEvent::SizeChanged(..) | WindowEvent::Resized(..)
                     ) {
                         let size = self.window.drawable_size();
-                        engine.render.resize(size.into());
+                        engine.render.borrow_mut().resize(size.into());
                     }
                 }
                 _ => {}
