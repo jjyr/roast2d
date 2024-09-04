@@ -1,9 +1,3 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
-
-use anyhow::Result;
 pub use glam::Vec2;
 
 /// Rect
@@ -13,48 +7,12 @@ pub struct Rect {
     pub max: Vec2,
 }
 
-/// A mutable reference
-pub struct Mut<T: ?Sized>(Rc<RefCell<T>>);
-
-impl<T: ?Sized> From<Rc<RefCell<T>>> for Mut<T> {
-    fn from(value: Rc<RefCell<T>>) -> Self {
-        Self(value)
-    }
-}
-
-impl<T> Mut<T> {
-    pub fn new(v: T) -> Mut<T> {
-        Self(Rc::new(RefCell::new(v)))
-    }
-}
-
-impl<T: ?Sized> Mut<T> {
-    #[cfg_attr(feature = "debug_mut", track_caller)]
-    pub fn borrow(&self) -> Ref<'_, T> {
-        self.0.borrow()
-    }
-
-    #[cfg_attr(feature = "debug_mut", track_caller)]
-    pub fn borrow_mut(&self) -> RefMut<'_, T> {
-        self.0.borrow_mut()
-    }
-
-    #[cfg_attr(feature = "debug_mut", track_caller)]
-    pub fn try_borrow(&self) -> Result<Ref<'_, T>> {
-        let r = self.0.try_borrow()?;
-        Ok(r)
-    }
-
-    #[cfg_attr(feature = "debug_mut", track_caller)]
-    pub fn try_borrow_mut(&self) -> Result<RefMut<'_, T>> {
-        let r = self.0.try_borrow_mut()?;
-        Ok(r)
-    }
-}
-
-impl<T: ?Sized> Clone for Mut<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
+impl Rect {
+    pub(crate) fn is_touching(&self, other: &Self) -> bool {
+        !(self.min.x > other.max.x
+            || self.max.x < other.min.x
+            || self.min.y > other.max.y
+            || self.max.y < other.min.y)
     }
 }
 

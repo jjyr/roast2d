@@ -1,8 +1,4 @@
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-    rc::Rc,
-};
+use std::any::{Any, TypeId};
 
 use bitflags::bitflags;
 use dyn_clone::DynClone;
@@ -12,35 +8,44 @@ use crate::{
     animation::Animation,
     engine::Engine,
     trace::{trace, Trace},
-    types::{Mut, Rect},
+    types::Rect,
 };
 
-/// Call with ent instance
-macro_rules! with_ent {
-    ($ent: expr, $f: expr) => {
-        if let Some(mut instance) = $ent.instance.take() {
-            $f(&mut instance);
-            $ent.instance.replace(instance);
-        } else {
-            log::error!("Can't get entity instance {:?}", $ent.ent_ref)
-        }
+pub fn with_ent<F: FnOnce(&mut Engine, EntRef, &mut dyn EntType)>(
+    eng: &mut Engine,
+    ent_ref: EntRef,
+    f: F,
+) {
+    let Some(mut instance) =
+        eng.with_world(|_, mut w| w.get_mut(ent_ref).and_then(|ent| ent.instance.take()))
+    else {
+        log::debug!("Can't get entity instance {:?}", ent_ref);
+        return;
     };
-}
 
-pub(crate) use with_ent;
+    // call
+    f(eng, ent_ref, instance.as_mut());
+
+    // set instance back
+    eng.with_world(|_, mut w| {
+        if let Some(ent) = w.get_mut(ent_ref) {
+            ent.instance.replace(instance);
+        }
+    });
+}
 
 const ENTITY_MIN_BOUNCE_VELOCITY: f32 = 10.0;
 
 bitflags! {
     #[repr(transparent)]
     #[derive(Debug, Clone, Copy)]
-    pub struct EntityPhysics: u8 {
+    pub struct EntPhysics: u8 {
         const NONE = 0;
         // Move the entity according to its velocity, but don't collide
         const MOVE = 1 << 0;
 
         // Move the entity and collide with the collision_map
-        const WORLD = EntityPhysics::MOVE.bits() | EntityCollidesMode::WORLD.bits();
+        const WORLD = EntPhysics::MOVE.bits() | EntCollidesMode::WORLD.bits();
 
         // Move the entity, collide with the collision_map and other entities, but
         // only those other entities that have matching physics:
@@ -49,19 +54,19 @@ bitflags! {
         // vs. PASSIVE collisions, both entities are moved. LITE or PASSIVE entities
         // don't collide with other LITE or PASSIVE entities at all. The behaiviour
         // for FIXED vs. FIXED collisions is undefined.
-        const LITE = EntityPhysics::WORLD.bits() | EntityCollidesMode::LITE.bits();
-        const PASSIVE = EntityPhysics::WORLD.bits() | EntityCollidesMode::PASSIVE.bits();
-        const ACTIVE = EntityPhysics::WORLD.bits() | EntityCollidesMode::ACTIVE.bits();
-        const FIXED = EntityPhysics::WORLD.bits() | EntityCollidesMode::FIXED.bits();
+        const LITE = EntPhysics::WORLD.bits() | EntCollidesMode::LITE.bits();
+        const PASSIVE = EntPhysics::WORLD.bits() | EntCollidesMode::PASSIVE.bits();
+        const ACTIVE = EntPhysics::WORLD.bits() | EntCollidesMode::ACTIVE.bits();
+        const FIXED = EntPhysics::WORLD.bits() | EntCollidesMode::FIXED.bits();
     }
 }
 
-impl EntityPhysics {
-    pub fn is_at_least(self, physics: EntityPhysics) -> bool {
+impl EntPhysics {
+    pub fn is_at_least(self, physics: EntPhysics) -> bool {
         self.bits() >= physics.bits()
     }
 
-    pub fn is_collide_mode(self, mode: EntityCollidesMode) -> bool {
+    pub fn is_collide_mode(self, mode: EntCollidesMode) -> bool {
         self.bits() & mode.bits() != 0
     }
 }
@@ -69,7 +74,7 @@ impl EntityPhysics {
 bitflags! {
     #[repr(transparent)]
     #[derive(Debug, Clone, Copy)]
-    pub struct EntityCollidesMode: u8 {
+    pub struct EntCollidesMode: u8 {
         const WORLD = 1 << 1;
         const LITE = 1 << 4;
         const PASSIVE = 1 << 5;
@@ -95,9 +100,9 @@ bitflags! {
 
 /// Entity type
 #[derive(Hash, PartialEq, Eq, Clone)]
-pub struct EntityTypeId(pub TypeId);
+pub struct EntTypeId(pub TypeId);
 
-impl EntityTypeId {
+impl EntTypeId {
     pub fn of<T: 'static>() -> Self {
         Self(TypeId::of::<T>())
     }
@@ -107,20 +112,20 @@ impl EntityTypeId {
     }
 }
 
-impl From<TypeId> for EntityTypeId {
+impl From<TypeId> for EntTypeId {
     fn from(value: TypeId) -> Self {
         Self(value)
     }
 }
 
 /// Entity
-pub struct Entity {
-    pub ent_ref: EntityRef,
+pub struct Ent {
+    pub ent_ref: EntRef,
     pub alive: bool,
     pub on_ground: bool,
     pub draw_order: u32,
-    pub ent_type: EntityTypeId,
-    pub physics: EntityPhysics,
+    pub ent_type: EntTypeId,
+    pub physics: EntPhysics,
     pub group: EntityGroup,
     pub check_against: EntityGroup,
     pub pos: Vec2,
@@ -139,25 +144,20 @@ pub struct Entity {
     pub max_ground_normal: f32,
     pub min_slide_normal: f32,
     pub anim: Option<Animation>,
-    pub(crate) instance: Option<Box<dyn EntityType>>,
+    pub(crate) instance: Option<Box<dyn EntType>>,
 }
 
-impl Entity {
-    pub(crate) fn new(
-        id: u16,
-        ent_type: EntityTypeId,
-        instance: Box<dyn EntityType>,
-        pos: Vec2,
-    ) -> Self {
+impl Ent {
+    pub(crate) fn new(id: u16, ent_type: EntTypeId, instance: Box<dyn EntType>, pos: Vec2) -> Self {
         let instance = Some(instance);
-        let ent_ref = EntityRef { id, index: 0 };
-        Entity {
+        let ent_ref = EntRef { id, index: 0 };
+        Ent {
             ent_ref,
             alive: true,
             on_ground: false,
             draw_order: 0,
             ent_type,
-            physics: EntityPhysics::NONE,
+            physics: EntPhysics::NONE,
             group: EntityGroup::NONE,
             check_against: EntityGroup::NONE,
             pos,
@@ -180,13 +180,8 @@ impl Entity {
         }
     }
 
-    pub(crate) fn is_touching(&self, other: &Entity) -> bool {
-        let self_bound = self.bounds();
-        let other_bound = other.bounds();
-        !(self_bound.min.x > other_bound.max.x
-            || self_bound.max.x < other_bound.min.x
-            || self_bound.min.y > other_bound.max.y
-            || self_bound.max.y < other_bound.min.y)
+    pub(crate) fn is_valid(&self, ent_ref: EntRef) -> bool {
+        self.alive && self.ent_ref.id == ent_ref.id
     }
 
     pub fn scaled_size(&self) -> Vec2 {
@@ -206,13 +201,22 @@ impl Entity {
 /// The index of EntityRef may be changed due to reordering,
 ///  so it is suggest to only use id to build relation.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct EntityRef {
-    id: u16,
-    index: u16,
+pub struct EntRef {
+    pub(crate) id: u16,
+    pub(crate) index: u16,
+}
+
+impl Default for EntRef {
+    fn default() -> Self {
+        Self {
+            id: u16::MAX,
+            index: u16::MAX,
+        }
+    }
 }
 
 /// EntityDef
-pub trait EntityType: DynClone {
+pub trait EntType: DynClone {
     /// Load an entity type
     ///
     /// This function called only once on EntityType registration.
@@ -223,204 +227,125 @@ pub trait EntityType: DynClone {
         Self: Sized;
 
     /// Initialize an entity
-    fn init(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
+    fn init(&mut self, _eng: &mut Engine, _ent: EntRef) {}
 
     /// Load entity settings
-    fn settings(&mut self, _eng: &mut Engine, _ent: &mut Entity, _settings: serde_json::Value) {}
+    fn settings(&mut self, _eng: &mut Engine, _ent: EntRef, _settings: serde_json::Value) {}
 
     /// Update callback is called before the entity_base_update
-    fn update(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
+    fn update(&mut self, _eng: &mut Engine, _ent: EntRef) {}
 
     /// Post update callback is called after the entity_base_update
-    fn post_update(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
+    fn post_update(&mut self, _eng: &mut Engine, _ent: EntRef) {}
 
     // Draw entity anim
-    fn draw(&self, eng: &mut Engine, ent: &mut Entity, viewport: Vec2) {
-        if let Some(anim) = ent.anim.as_mut() {
-            anim.draw(
-                &mut eng.render,
-                (ent.pos - viewport) - ent.offset,
-                Some(ent.scale),
-                Some(ent.angle),
-            );
-        }
+    fn draw(&self, eng: &mut Engine, ent: EntRef, viewport: Vec2) {
+        eng.with_world(|eng, w| {
+            let Some(ent) = w.get(ent) else {
+                return;
+            };
+            if let Some(anim) = ent.anim.as_ref() {
+                eng.render.borrow_mut().draw_image(
+                    &anim.sheet,
+                    (ent.pos - viewport) - ent.offset,
+                    Some(ent.scale),
+                    Some(ent.angle),
+                );
+            }
+        });
     }
 
     /// Called when entity is removed through kill
-    fn kill(&mut self, _eng: &mut Engine, _ent: &mut Entity) {}
+    fn kill(&mut self, _eng: &mut Engine, _ent: EntRef) {}
 
     /// Called if one entity is touched by another entity
-    fn touch(&mut self, _eng: &mut Engine, _ent: &mut Entity, _other: &mut Entity) {}
+    fn touch(&mut self, _eng: &mut Engine, _ent: EntRef, _other: EntRef) {}
 
     /// Called when two entity are collide
-    fn collide(
-        &mut self,
-        _eng: &mut Engine,
-        _ent: &mut Entity,
-        _normal: Vec2,
-        _trace: Option<&Trace>,
-    ) {
-    }
+    fn collide(&mut self, _eng: &mut Engine, _ent: EntRef, _normal: Vec2, _trace: Option<&Trace>) {}
 
     /// Called when entity get damage
-    fn damage(&mut self, eng: &mut Engine, ent: &mut Entity, _other: &mut Entity, damage: f32) {
-        ent.health -= damage;
-        if ent.health < 0.0 && ent.alive {
-            eng.kill(ent.ent_ref);
-        }
+    fn damage(&mut self, eng: &mut Engine, ent: EntRef, _other: EntRef, damage: f32) {
+        eng.with_world(|eng, mut w| {
+            let Some(ent) = w.get_mut(ent) else {
+                return;
+            };
+            ent.health -= damage;
+            if ent.health < 0.0 && ent.alive {
+                let ent_ref = ent.ent_ref;
+                eng.kill(ent_ref);
+            }
+        });
     }
 
     /// Called when entity is triggerred by another entity
-    fn trigger(&mut self, _eng: &mut Engine, _ent: &mut Entity, _other: &mut Entity) {}
+    fn trigger(&mut self, _eng: &mut Engine, _ent: EntRef, _other: EntRef) {}
 
     /// Called when entity recives a message
-    fn message(
-        &mut self,
-        _eng: &mut Engine,
-        _ent: &mut Entity,
-        _message: u32,
-        _data: Box<dyn Any>,
-    ) {
-    }
-}
-
-/// World contains entities
-#[derive(Default)]
-pub struct World {
-    /// Unique id counter
-    pub(crate) unique_id: u16,
-    /// This field may be reorder
-    pub(crate) entities: Vec<Mut<Entity>>,
-    /// Allocated entities count
-    pub(crate) alloced: usize,
-    /// Fixed storage of entities, the index is unchanged
-    pub(crate) entities_storage: Vec<Mut<Entity>>,
-    /// Entity Types
-    pub(crate) entity_types: HashMap<EntityTypeId, Rc<dyn EntityType>>,
-    /// Name to Entity Types
-    pub(crate) name_to_entity_types: HashMap<String, EntityTypeId>,
-}
-
-impl World {
-    /// Get an entity type instance
-    pub(crate) fn get_entity_type_instance(
-        &self,
-        type_id: &EntityTypeId,
-    ) -> Option<Box<dyn EntityType>> {
-        self.entity_types.get(type_id).map(|ent_type| {
-            let t = ent_type.as_ref();
-            dyn_clone::clone_box(t)
-        })
-    }
-
-    /// Get an entity by ref
-    pub fn get(&self, ent_ref: EntityRef) -> Option<Mut<Entity>> {
-        self.entities_storage
-            .get(ent_ref.index as usize)
-            .filter(|ent| {
-                let ent = ent.borrow();
-                ent.alive && ent.ent_ref.id == ent_ref.id
-            })
-            .cloned()
-    }
-
-    /// Get an entity by ref
-    pub fn entities(&self) -> impl Iterator<Item = &Mut<Entity>> {
-        self.entities.iter()
-    }
-
-    /// Spawn a new entity
-    pub(crate) fn spawn(&mut self, mut ent: Entity) -> EntityRef {
-        let id = self.unique_id;
-        assert_eq!(ent.ent_ref.id, id, "expect unique_id");
-
-        let index: u16;
-        if self.entities.len() > self.alloced {
-            // reuse slot
-            let old_ent = self.entities[self.alloced].clone();
-            index = old_ent.borrow().ent_ref.index;
-            ent.ent_ref.index = index;
-            self.entities_storage[index as usize] = Mut::new(ent);
-        } else {
-            // alloc slot
-            index = self.entities_storage.len() as u16;
-            ent.ent_ref.index = index;
-            let ent = Mut::new(ent);
-            self.entities_storage.push(ent.clone());
-            self.entities.push(ent);
-            self.alloced += 1;
-        };
-
-        self.unique_id += 1;
-
-        EntityRef { id, index }
-    }
-
-    pub(crate) fn reset_entities(&mut self) {
-        self.entities.clear();
-        self.entities_storage.clear();
-        self.alloced = 0;
-    }
+    fn message(&mut self, _eng: &mut Engine, _ent: EntRef, _data: Box<dyn Any>) {}
 }
 
 /// Resolve entity collision
-pub(crate) fn resolve_collision(eng: &mut Engine, a: &mut Entity, b: &mut Entity) {
-    let a_bound = a.bounds();
-    let b_bound = b.bounds();
-    let overlap_x: f32 = if a_bound.min.x < b_bound.min.x {
-        a_bound.max.x - b_bound.min.x
-    } else {
-        b_bound.max.x - a_bound.min.x
-    };
-    let overlap_y: f32 = if a_bound.min.y < b_bound.min.y {
-        a_bound.max.y - b_bound.min.y
-    } else {
-        b_bound.max.y - a_bound.min.y
-    };
-
-    let a_move;
-    let b_move;
-    if a.physics.is_collide_mode(EntityCollidesMode::LITE)
-        || b.physics.is_collide_mode(EntityCollidesMode::FIXED)
-    {
-        a_move = 1.0;
-        b_move = 0.0;
-    } else if a.physics.is_collide_mode(EntityCollidesMode::FIXED)
-        || b.physics.is_collide_mode(EntityCollidesMode::LITE)
-    {
-        a_move = 0.0;
-        b_move = 1.0;
-    } else {
-        let total_mass = a.mass + b.mass;
-        a_move = b.mass / total_mass;
-        b_move = a.mass / total_mass;
-    }
-
-    if overlap_y > overlap_x {
-        if a_bound.min.x < b_bound.min.x {
-            entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
-            eng.collide(a, Vec2::new(-1.0, 0.0), None);
-            eng.collide(b, Vec2::new(1.0, 0.0), None);
+pub(crate) fn resolve_collision(eng: &mut Engine, a: EntRef, b: EntRef) {
+    eng.with_world(|eng, mut w| {
+        let [a, b] = w.many_mut([a, b]);
+        let a_bound = a.bounds();
+        let b_bound = b.bounds();
+        let overlap_x: f32 = if a_bound.min.x < b_bound.min.x {
+            a_bound.max.x - b_bound.min.x
         } else {
-            entities_separate_on_x_axis(eng, b, a, b_move, a_move, overlap_x);
-            eng.collide(a, Vec2::new(1.0, 0.0), None);
-            eng.collide(b, Vec2::new(-1.0, 0.0), None);
+            b_bound.max.x - a_bound.min.x
+        };
+        let overlap_y: f32 = if a_bound.min.y < b_bound.min.y {
+            a_bound.max.y - b_bound.min.y
+        } else {
+            b_bound.max.y - a_bound.min.y
+        };
+
+        let a_move;
+        let b_move;
+        if a.physics.is_collide_mode(EntCollidesMode::LITE)
+            || b.physics.is_collide_mode(EntCollidesMode::FIXED)
+        {
+            a_move = 1.0;
+            b_move = 0.0;
+        } else if a.physics.is_collide_mode(EntCollidesMode::FIXED)
+            || b.physics.is_collide_mode(EntCollidesMode::LITE)
+        {
+            a_move = 0.0;
+            b_move = 1.0;
+        } else {
+            let total_mass = a.mass + b.mass;
+            a_move = b.mass / total_mass;
+            b_move = a.mass / total_mass;
         }
-    } else if a_bound.min.y < b_bound.min.y {
-        entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
-        eng.collide(a, Vec2::new(0.0, -1.0), None);
-        eng.collide(b, Vec2::new(0.0, 1.0), None);
-    } else {
-        entities_separate_on_y_axis(eng, b, a, b_move, a_move, overlap_y, eng.tick);
-        eng.collide(a, Vec2::new(0.0, 1.0), None);
-        eng.collide(b, Vec2::new(0.0, -1.0), None);
-    }
+
+        if overlap_y > overlap_x {
+            if a_bound.min.x < b_bound.min.x {
+                entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
+                eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
+                eng.collide(b.ent_ref, Vec2::new(1.0, 0.0), None);
+            } else {
+                entities_separate_on_x_axis(eng, b, a, b_move, a_move, overlap_x);
+                eng.collide(a.ent_ref, Vec2::new(1.0, 0.0), None);
+                eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
+            }
+        } else if a_bound.min.y < b_bound.min.y {
+            entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
+            eng.collide(a.ent_ref, Vec2::new(0.0, -1.0), None);
+            eng.collide(b.ent_ref, Vec2::new(0.0, 1.0), None);
+        } else {
+            entities_separate_on_y_axis(eng, b, a, b_move, a_move, overlap_y, eng.tick);
+            eng.collide(a.ent_ref, Vec2::new(0.0, 1.0), None);
+            eng.collide(b.ent_ref, Vec2::new(0.0, -1.0), None);
+        }
+    });
 }
 
 pub(crate) fn entities_separate_on_x_axis(
     eng: &mut Engine,
-    left: &mut Entity,
-    right: &mut Entity,
+    left: &mut Ent,
+    right: &mut Ent,
     left_move: f32,
     right_move: f32,
     overlap: f32,
@@ -447,8 +372,8 @@ pub(crate) fn entities_separate_on_x_axis(
 
 pub(crate) fn entities_separate_on_y_axis(
     eng: &mut Engine,
-    top: &mut Entity,
-    bottom: &mut Entity,
+    top: &mut Ent,
+    bottom: &mut Ent,
     mut top_move: f32,
     mut bottom_move: f32,
     overlap: f32,
@@ -485,11 +410,11 @@ pub(crate) fn entities_separate_on_y_axis(
     }
 }
 
-pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Entity, vstep: Vec2) {
-    if ent.physics.contains(EntityPhysics::WORLD) && eng.collision_map.is_some() {
+pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Ent, vstep: Vec2) {
+    if ent.physics.contains(EntPhysics::WORLD) && eng.collision_map.is_some() {
         let map = eng.collision_map.as_ref().unwrap();
         let t = trace(map, ent.pos, vstep, ent.scaled_size());
-        handle_trace_result(eng, ent, &t);
+        handle_trace_result(eng, ent, t.clone());
         // The previous trace was stopped short and we still have some velocity
         // left? Do a second trace with the new velocity. this allows us
         // to slide along tiles;
@@ -502,7 +427,7 @@ pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Entity, vstep: Vec2) {
                 let vstep2 = rotated_normal * (vel_along_normal * remaining);
                 let map = eng.collision_map.as_ref().unwrap();
                 let t2 = trace(map, ent.pos, vstep2, ent.scaled_size());
-                handle_trace_result(eng, ent, &t2);
+                handle_trace_result(eng, ent, t2);
             }
         }
     } else {
@@ -510,16 +435,15 @@ pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Entity, vstep: Vec2) {
     }
 }
 
-fn handle_trace_result(eng: &mut Engine, ent: &mut Entity, t: &Trace) {
+fn handle_trace_result(eng: &mut Engine, ent: &mut Ent, t: Trace) {
     ent.pos = t.pos;
 
+    // FIXME call check collision rule
     if t.tile == 0 {
         return;
     }
 
-    with_ent!(ent, |instance: &mut Box<dyn EntityType>| {
-        instance.collide(eng, ent, t.normal, Some(t));
-    });
+    eng.collide(ent.ent_ref, t.normal, Some(t.clone()));
 
     // If this entity is bouncy, calculate the velocity against the
     // slope's normal (the dot product) and see if we want to bounce
