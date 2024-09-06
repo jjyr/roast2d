@@ -217,4 +217,21 @@ impl World {
         self.entities_storage.clear();
         self.alloced = 0;
     }
+
+    pub(crate) fn with_ent<F: FnOnce(&mut World, EntRef, &mut dyn EntType)>(
+        &mut self,
+        ent_ref: EntRef,
+        f: F,
+    ) {
+        let Some(mut instance) = self.get_mut(ent_ref).and_then(|ent| ent.instance.take()) else {
+            log::debug!("Can't get entity instance {:?}", ent_ref);
+            return;
+        };
+        // call
+        f(self, ent_ref, instance.as_mut());
+        // set instance back
+        if let Some(ent) = self.get_mut(ent_ref) {
+            ent.instance.replace(instance);
+        }
+    }
 }

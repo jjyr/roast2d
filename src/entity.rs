@@ -9,30 +9,8 @@ use crate::{
     engine::Engine,
     trace::{trace, Trace},
     types::Rect,
+    world::World,
 };
-
-pub fn with_ent<F: FnOnce(&mut Engine, EntRef, &mut dyn EntType)>(
-    eng: &mut Engine,
-    ent_ref: EntRef,
-    f: F,
-) {
-    let Some(mut instance) =
-        eng.with_world(|_, mut w| w.get_mut(ent_ref).and_then(|ent| ent.instance.take()))
-    else {
-        log::debug!("Can't get entity instance {:?}", ent_ref);
-        return;
-    };
-
-    // call
-    f(eng, ent_ref, instance.as_mut());
-
-    // set instance back
-    eng.with_world(|_, mut w| {
-        if let Some(ent) = w.get_mut(ent_ref) {
-            ent.instance.replace(instance);
-        }
-    });
-}
 
 const ENTITY_MIN_BOUNCE_VELOCITY: f32 = 10.0;
 
@@ -86,7 +64,7 @@ bitflags! {
 bitflags! {
     #[repr(transparent)]
     #[derive(Debug, Clone, Copy)]
-    pub struct EntityGroup: u8 {
+    pub struct EntGroup: u8 {
         const NONE = 0;
         const PLAYER = 1 << 0;
         const NPC = 1 << 1;
@@ -126,8 +104,8 @@ pub struct Ent {
     pub draw_order: u32,
     pub ent_type: EntTypeId,
     pub physics: EntPhysics,
-    pub group: EntityGroup,
-    pub check_against: EntityGroup,
+    pub group: EntGroup,
+    pub check_against: EntGroup,
     pub pos: Vec2,
     pub scale: Vec2,
     pub angle: f32,
@@ -158,8 +136,8 @@ impl Ent {
             draw_order: 0,
             ent_type,
             physics: EntPhysics::NONE,
-            group: EntityGroup::NONE,
-            check_against: EntityGroup::NONE,
+            group: EntGroup::NONE,
+            check_against: EntGroup::NONE,
             pos,
             size: Vec2 { x: 8.8, y: 8.8 },
             vel: Vec2::default(),
@@ -222,124 +200,140 @@ pub trait EntType: DynClone {
     /// This function called only once on EntityType registration.
     /// Assets loading should be done in this callback,
     /// all Entity instances are cloned from this one when spawn is called.
-    fn load(_eng: &mut Engine) -> Self
+    fn load(_eng: &mut Engine, _w: &mut World) -> Self
     where
         Self: Sized;
 
     /// Initialize an entity
-    fn init(&mut self, _eng: &mut Engine, _ent: EntRef) {}
+    fn init(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef) {}
 
     /// Load entity settings
-    fn settings(&mut self, _eng: &mut Engine, _ent: EntRef, _settings: serde_json::Value) {}
+    fn settings(
+        &mut self,
+        _eng: &mut Engine,
+        _w: &mut World,
+        _ent: EntRef,
+        _settings: serde_json::Value,
+    ) {
+    }
 
     /// Update callback is called before the entity_base_update
-    fn update(&mut self, _eng: &mut Engine, _ent: EntRef) {}
+    fn update(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef) {}
 
     /// Post update callback is called after the entity_base_update
-    fn post_update(&mut self, _eng: &mut Engine, _ent: EntRef) {}
+    fn post_update(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef) {}
 
     // Draw entity anim
-    fn draw(&self, eng: &mut Engine, ent: EntRef, viewport: Vec2) {
-        eng.with_world(|eng, w| {
-            let Some(ent) = w.get(ent) else {
-                return;
-            };
-            if let Some(anim) = ent.anim.as_ref() {
-                eng.render.borrow_mut().draw_image(
-                    &anim.sheet,
-                    (ent.pos - viewport) - ent.offset,
-                    Some(ent.scale),
-                    Some(ent.angle),
-                );
-            }
-        });
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: EntRef, viewport: Vec2) {
+        let Some(ent) = w.get(ent) else {
+            return;
+        };
+        if let Some(anim) = ent.anim.as_ref() {
+            eng.render.borrow_mut().draw_image(
+                &anim.sheet,
+                (ent.pos - viewport) - ent.offset,
+                Some(ent.scale),
+                Some(ent.angle),
+            );
+        }
     }
 
     /// Called when entity is removed through kill
-    fn kill(&mut self, _eng: &mut Engine, _ent: EntRef) {}
+    fn kill(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef) {}
 
     /// Called if one entity is touched by another entity
-    fn touch(&mut self, _eng: &mut Engine, _ent: EntRef, _other: EntRef) {}
+    fn touch(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef, _other: EntRef) {}
 
     /// Called when two entity are collide
-    fn collide(&mut self, _eng: &mut Engine, _ent: EntRef, _normal: Vec2, _trace: Option<&Trace>) {}
+    fn collide(
+        &mut self,
+        _eng: &mut Engine,
+        _w: &mut World,
+        _ent: EntRef,
+        _normal: Vec2,
+        _trace: Option<&Trace>,
+    ) {
+    }
 
     /// Called when entity get damage
-    fn damage(&mut self, eng: &mut Engine, ent: EntRef, _other: EntRef, damage: f32) {
-        eng.with_world(|eng, mut w| {
-            let Some(ent) = w.get_mut(ent) else {
-                return;
-            };
-            ent.health -= damage;
-            if ent.health < 0.0 && ent.alive {
-                let ent_ref = ent.ent_ref;
-                eng.kill(ent_ref);
-            }
-        });
+    fn damage(
+        &mut self,
+        eng: &mut Engine,
+        w: &mut World,
+        ent: EntRef,
+        _other: EntRef,
+        damage: f32,
+    ) {
+        let Some(ent) = w.get_mut(ent) else {
+            return;
+        };
+        ent.health -= damage;
+        if ent.health < 0.0 && ent.alive {
+            let ent_ref = ent.ent_ref;
+            eng.kill(ent_ref);
+        }
     }
 
     /// Called when entity is triggerred by another entity
-    fn trigger(&mut self, _eng: &mut Engine, _ent: EntRef, _other: EntRef) {}
+    fn trigger(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef, _other: EntRef) {}
 
     /// Called when entity recives a message
-    fn message(&mut self, _eng: &mut Engine, _ent: EntRef, _data: Box<dyn Any>) {}
+    fn message(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef, _data: Box<dyn Any>) {}
 }
 
 /// Resolve entity collision
-pub(crate) fn resolve_collision(eng: &mut Engine, a: EntRef, b: EntRef) {
-    eng.with_world(|eng, mut w| {
-        let [a, b] = w.many_mut([a, b]);
-        let a_bound = a.bounds();
-        let b_bound = b.bounds();
-        let overlap_x: f32 = if a_bound.min.x < b_bound.min.x {
-            a_bound.max.x - b_bound.min.x
-        } else {
-            b_bound.max.x - a_bound.min.x
-        };
-        let overlap_y: f32 = if a_bound.min.y < b_bound.min.y {
-            a_bound.max.y - b_bound.min.y
-        } else {
-            b_bound.max.y - a_bound.min.y
-        };
+pub(crate) fn resolve_collision(eng: &mut Engine, w: &mut World, a: EntRef, b: EntRef) {
+    let [a, b] = w.many_mut([a, b]);
+    let a_bound = a.bounds();
+    let b_bound = b.bounds();
+    let overlap_x: f32 = if a_bound.min.x < b_bound.min.x {
+        a_bound.max.x - b_bound.min.x
+    } else {
+        b_bound.max.x - a_bound.min.x
+    };
+    let overlap_y: f32 = if a_bound.min.y < b_bound.min.y {
+        a_bound.max.y - b_bound.min.y
+    } else {
+        b_bound.max.y - a_bound.min.y
+    };
 
-        let a_move;
-        let b_move;
-        if a.physics.is_collide_mode(EntCollidesMode::LITE)
-            || b.physics.is_collide_mode(EntCollidesMode::FIXED)
-        {
-            a_move = 1.0;
-            b_move = 0.0;
-        } else if a.physics.is_collide_mode(EntCollidesMode::FIXED)
-            || b.physics.is_collide_mode(EntCollidesMode::LITE)
-        {
-            a_move = 0.0;
-            b_move = 1.0;
-        } else {
-            let total_mass = a.mass + b.mass;
-            a_move = b.mass / total_mass;
-            b_move = a.mass / total_mass;
-        }
+    let a_move;
+    let b_move;
+    if a.physics.is_collide_mode(EntCollidesMode::LITE)
+        || b.physics.is_collide_mode(EntCollidesMode::FIXED)
+    {
+        a_move = 1.0;
+        b_move = 0.0;
+    } else if a.physics.is_collide_mode(EntCollidesMode::FIXED)
+        || b.physics.is_collide_mode(EntCollidesMode::LITE)
+    {
+        a_move = 0.0;
+        b_move = 1.0;
+    } else {
+        let total_mass = a.mass + b.mass;
+        a_move = b.mass / total_mass;
+        b_move = a.mass / total_mass;
+    }
 
-        if overlap_y > overlap_x {
-            if a_bound.min.x < b_bound.min.x {
-                entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
-                eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
-                eng.collide(b.ent_ref, Vec2::new(1.0, 0.0), None);
-            } else {
-                entities_separate_on_x_axis(eng, b, a, b_move, a_move, overlap_x);
-                eng.collide(a.ent_ref, Vec2::new(1.0, 0.0), None);
-                eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
-            }
-        } else if a_bound.min.y < b_bound.min.y {
-            entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
-            eng.collide(a.ent_ref, Vec2::new(0.0, -1.0), None);
-            eng.collide(b.ent_ref, Vec2::new(0.0, 1.0), None);
+    if overlap_y > overlap_x {
+        if a_bound.min.x < b_bound.min.x {
+            entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
+            eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
+            eng.collide(b.ent_ref, Vec2::new(1.0, 0.0), None);
         } else {
-            entities_separate_on_y_axis(eng, b, a, b_move, a_move, overlap_y, eng.tick);
-            eng.collide(a.ent_ref, Vec2::new(0.0, 1.0), None);
-            eng.collide(b.ent_ref, Vec2::new(0.0, -1.0), None);
+            entities_separate_on_x_axis(eng, b, a, b_move, a_move, overlap_x);
+            eng.collide(a.ent_ref, Vec2::new(1.0, 0.0), None);
+            eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
         }
-    });
+    } else if a_bound.min.y < b_bound.min.y {
+        entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
+        eng.collide(a.ent_ref, Vec2::new(0.0, -1.0), None);
+        eng.collide(b.ent_ref, Vec2::new(0.0, 1.0), None);
+    } else {
+        entities_separate_on_y_axis(eng, b, a, b_move, a_move, overlap_y, eng.tick);
+        eng.collide(a.ent_ref, Vec2::new(0.0, 1.0), None);
+        eng.collide(b.ent_ref, Vec2::new(0.0, -1.0), None);
+    }
 }
 
 pub(crate) fn entities_separate_on_x_axis(

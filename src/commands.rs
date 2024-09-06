@@ -30,7 +30,7 @@ pub(crate) enum Command {
         ent: EntRef,
         settings: Value,
     },
-    KillEntity {
+    KillEnt {
         ent: EntRef,
     },
     Damage {

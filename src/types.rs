@@ -1,4 +1,4 @@
-pub use glam::Vec2;
+use glam::Vec2;
 
 /// Rect
 #[derive(Debug, Clone)]
