@@ -1,6 +1,6 @@
 use std::{
     any::{type_name, Any},
-    cell::{RefCell, RefMut},
+    cell::{RefCell, UnsafeCell},
     rc::Rc,
 };
 
@@ -13,8 +13,8 @@ use crate::{
     collision_map::{CollisionMap, COLLISION_MAP},
     commands::{Command, Commands},
     entity::{
-        entity_move, resolve_collision, with_ent, Ent, EntCollidesMode, EntPhysics, EntRef,
-        EntType, EntTypeId,
+        entity_move, resolve_collision, Ent, EntCollidesMode, EntPhysics, EntRef, EntType,
+        EntTypeId,
     },
     font::Text,
     handle::Handle,
@@ -34,20 +34,20 @@ const ENGINE_MAX_TICK: f32 = 100.0;
 // Scene trait
 pub trait Scene {
     // Init the scene, use it to load assets and setup entities.
-    fn init(&mut self, _eng: &mut Engine) {}
+    fn init(&mut self, _eng: &mut Engine, _w: &mut World) {}
 
     // Update scene per frame, you probably want to call scene_base_update if you override this function.
-    fn update(&mut self, eng: &mut Engine) {
-        eng.scene_base_update();
+    fn update(&mut self, eng: &mut Engine, w: &mut World) {
+        eng.scene_base_update(w);
     }
 
     // Draw scene per frame, use it to draw entities or Hud, you probably want to call scene_base_draw if you override this function.
-    fn draw(&mut self, eng: &mut Engine) {
-        eng.scene_base_draw();
+    fn draw(&mut self, eng: &mut Engine, w: &mut World) {
+        eng.scene_base_draw(w);
     }
 
     // Called when cleanup scene, release assets and resources.
-    fn cleanup(&mut self, _eng: &mut Engine) {}
+    fn cleanup(&mut self, _eng: &mut Engine, _w: &mut World) {}
 }
 
 #[derive(Default)]
@@ -102,7 +102,7 @@ pub struct Engine {
     is_running: bool,
     scene: Option<Box<dyn Scene>>,
     scene_next: Option<Box<dyn Scene>>,
-    pub(crate) world: Rc<RefCell<World>>,
+    pub(crate) world: UnsafeCell<World>,
 
     // camera
     pub(crate) camera: Camera,
@@ -132,7 +132,7 @@ impl Engine {
             is_running: false,
             scene: None,
             scene_next: None,
-            world: Rc::new(RefCell::new(Default::default())),
+            world: UnsafeCell::new(Default::default()),
             render: RefCell::new(Render::new(platform)),
             input: InputState::default(),
             commands: Commands::default(),
@@ -143,16 +143,16 @@ impl Engine {
 
     /// Registry a new entity type
     /// this function must be called before add entity
-    pub fn add_ent_type<T: EntType + Clone + 'static>(&mut self) {
-        let ent_type: Rc<dyn EntType> = Rc::new(T::load(self));
-        self.world.borrow_mut().add_ent_type::<T>(ent_type);
+    pub fn add_ent_type<T: EntType + Clone + 'static>(&mut self, w: &mut World) {
+        let ent_type: Rc<dyn EntType> = Rc::new(T::load(self, w));
+        w.add_ent_type::<T>(ent_type);
     }
 
     /// Spawn a new entity
-    pub fn spawn<T: EntType + 'static>(&mut self, pos: Vec2) -> EntRef {
+    pub fn spawn<T: EntType + 'static>(&mut self, w: &mut World, pos: Vec2) -> EntRef {
         // fetch id
         let ent_type = EntTypeId::of::<T>();
-        match self.spawn_with_type_id(ent_type, pos) {
+        match self.spawn_with_type_id(w, ent_type, pos) {
             Some(ent_ref) => ent_ref,
             None => {
                 panic!(
@@ -163,15 +163,11 @@ impl Engine {
         }
     }
 
-    pub(crate) fn with_platform<R, F: FnOnce(&mut dyn Platform) -> R>(&mut self, f: F) -> R {
-        let mut r = self.render.borrow_mut();
-        f(r.platform.as_mut())
-    }
-
-    pub fn spawn_with_type_name(&mut self, name: String, pos: Vec2) -> EntRef {
-        match self
-            .with_world(|_eng: &mut Engine, w: RefMut<World>| w.get_type_id_by_name(&name).cloned())
-            .and_then(|ent_type_id| self.spawn_with_type_id(ent_type_id, pos))
+    pub fn spawn_with_type_name(&mut self, w: &mut World, name: String, pos: Vec2) -> EntRef {
+        match w
+            .get_type_id_by_name(&name)
+            .cloned()
+            .and_then(|ent_type_id| self.spawn_with_type_id(w, ent_type_id, pos))
         {
             Some(ent_ref) => ent_ref,
             None => {
@@ -180,23 +176,32 @@ impl Engine {
         }
     }
 
-    pub fn spawn_with_type_id(&mut self, ent_type: EntTypeId, pos: Vec2) -> Option<EntRef> {
+    fn spawn_with_type_id(
+        &mut self,
+        w: &mut World,
+        ent_type: EntTypeId,
+        pos: Vec2,
+    ) -> Option<EntRef> {
         let ent_ref = {
-            let mut world = self.world.borrow_mut();
-            let instance = world.get_ent_type_instance(&ent_type)?;
-            let id = world.next_unique_id();
+            let instance = w.get_ent_type_instance(&ent_type)?;
+            let id = w.next_unique_id();
 
             // add to world
             let ent = Ent::new(id, ent_type, instance, pos);
-            world.spawn(ent)
+            w.spawn(ent)
         };
 
         // init
-        with_ent(self, ent_ref, |eng, ent_ref, instance: &mut dyn EntType| {
-            instance.init(eng, ent_ref);
+        w.with_ent(ent_ref, |w, ent_ref, instance: &mut dyn EntType| {
+            instance.init(self, w, ent_ref);
         });
 
         Some(ent_ref)
+    }
+
+    pub(crate) fn with_platform<R, F: FnOnce(&mut dyn Platform) -> R>(&mut self, f: F) -> R {
+        let mut r = self.render.borrow_mut();
+        f(r.platform.as_mut())
     }
 
     /// Create text
@@ -284,12 +289,6 @@ impl Engine {
         self.with_platform(|p| p.now())
     }
 
-    // World
-    pub fn with_world<R, F: FnOnce(&mut Engine, RefMut<World>) -> R>(&mut self, f: F) -> R {
-        let world = self.world.clone();
-        f(self, world.as_ref().borrow_mut())
-    }
-
     // Input
     pub fn camera(&self) -> &Camera {
         &self.camera
@@ -310,12 +309,15 @@ impl Engine {
         &mut self.input
     }
 
-    pub(crate) fn init(&mut self) {
+    pub(crate) fn init<Setup: FnOnce(&mut Engine, &mut World)>(&mut self, setup: Setup) {
+        let world = unsafe { self.world.get().as_mut().unwrap() };
+        setup(self, world);
+
         self.time_real = self.now();
     }
 
     /// Scene base draw, draw maps and entities
-    pub fn scene_base_draw(&mut self) {
+    pub fn scene_base_draw(&mut self, w: &mut World) {
         let mut render = self.render.borrow_mut();
         let px_viewport = render.snap_px(self.camera.viewport);
 
@@ -327,7 +329,7 @@ impl Engine {
         }
         drop(render);
 
-        self.entities_draw(px_viewport);
+        self.entities_draw(w, px_viewport);
 
         // Foreground maps
         let mut render = self.render.borrow_mut();
@@ -339,81 +341,58 @@ impl Engine {
     }
 
     /// Scene base update, update entities
-    pub fn scene_base_update(&mut self) {
-        self.entities_update();
+    pub fn scene_base_update(&mut self, w: &mut World) {
+        self.entities_update(w);
     }
 
     /// Entity base update, handle physics velocities
-    pub(crate) fn entity_base_update(&mut self, ent: EntRef) {
-        self.with_world(|eng, mut world| {
-            let Some(ent) = world.get_mut(ent) else {
-                return;
-            };
-            if !ent.physics.contains(EntPhysics::MOVE) {
-                return;
-            }
-            // Integrate velocity
-            let vel = ent.vel;
-            ent.vel.y += eng.gravity * ent.gravity * eng.tick;
-            let fric = Vec2::new(
-                (ent.friction.x * eng.tick).min(1.0),
-                (ent.friction.y * eng.tick).min(1.0),
-            );
-            ent.vel = ent.vel + (ent.accel * eng.tick - ent.vel * fric);
-            let vstep = (vel + ent.vel) * (eng.tick * 0.5);
-            ent.on_ground = false;
-            entity_move(eng, ent, vstep);
-        });
+    pub(crate) fn entity_base_update(&mut self, w: &mut World, ent: EntRef) {
+        let Some(ent) = w.get_mut(ent) else {
+            return;
+        };
+        if !ent.physics.contains(EntPhysics::MOVE) {
+            return;
+        }
+        // Integrate velocity
+        let vel = ent.vel;
+        ent.vel.y += self.gravity * ent.gravity * self.tick;
+        let fric = Vec2::new(
+            (ent.friction.x * self.tick).min(1.0),
+            (ent.friction.y * self.tick).min(1.0),
+        );
+        ent.vel = ent.vel + (ent.accel * self.tick - ent.vel * fric);
+        let vstep = (vel + ent.vel) * (self.tick * 0.5);
+        ent.on_ground = false;
+        entity_move(self, ent, vstep);
     }
 
-    fn entities_draw(&mut self, viewport: Vec2) {
+    fn entities_draw(&mut self, w: &mut World, viewport: Vec2) {
         // Sort entities by draw_order
-        let mut ents: Vec<_> = self.with_world(|_eng: &mut Engine, world: RefMut<World>| {
-            world.entities().map(|ent| ent.ent_ref).collect()
-        });
-        ents.sort_by_key(|ent_ref| {
-            self.with_world(|_: &mut Engine, world: RefMut<World>| {
-                world.get(*ent_ref).unwrap().draw_order
-            })
-        });
+        let mut ents: Vec<_> = w.entities().map(|ent| ent.ent_ref).collect();
+        ents.sort_by_key(|ent_ref| w.get(*ent_ref).unwrap().draw_order);
         for ent_ref in ents {
-            with_ent(
-                self,
-                ent_ref,
-                |eng: &mut Engine, ent_ref: EntRef, instance: &mut dyn EntType| {
-                    instance.draw(eng, ent_ref, viewport);
-                },
-            );
+            w.with_ent(ent_ref, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
+                instance.draw(self, w, ent_ref, viewport);
+            });
         }
     }
 
-    fn entities_update(&mut self) {
+    fn entities_update(&mut self, w: &mut World) {
         // Update all entities
         let mut i = 0;
-        while i < self.with_world(|_, w: RefMut<World>| w.alloced()) {
-            let ent_ref = self.with_world(|_, w: _| w.get_nth(i).cloned().unwrap());
-            with_ent(
-                self,
-                ent_ref,
-                |eng: &mut Engine, ent_ref: EntRef, instance: &mut dyn EntType| {
-                    instance.update(eng, ent_ref);
-                },
-            );
-            self.entity_base_update(ent_ref);
-            with_ent(
-                self,
-                ent_ref,
-                |eng: &mut Engine, ent_ref, instance: &mut dyn EntType| {
-                    instance.post_update(eng, ent_ref);
-                },
-            );
-
-            self.with_world(|_, mut w| {
-                if w.get_unchecked(ent_ref).is_some_and(|ent| !ent.alive) {
-                    // remove if not alive
-                    w.swap_remove(i);
-                }
+        while i < w.alloced() {
+            let ent_ref = w.get_nth(i).cloned().unwrap();
+            w.with_ent(ent_ref, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
+                instance.update(self, w, ent_ref);
             });
+            self.entity_base_update(w, ent_ref);
+            w.with_ent(ent_ref, |w, ent_ref, instance: &mut dyn EntType| {
+                instance.post_update(self, w, ent_ref);
+            });
+            if w.get_unchecked(ent_ref).is_some_and(|ent| !ent.alive) {
+                // remove if not alive
+                w.swap_remove(i);
+            }
 
             i += 1;
         }
@@ -421,94 +400,88 @@ impl Engine {
         // Sort by x or y position
         // insertion sort can gain better performance since list is sorted in every frames
         let sweep_axis = self.sweep_axis;
-        self.with_world(|_, mut w| w.sort_entities_for_sweep(sweep_axis));
+        w.sort_entities_for_sweep(sweep_axis);
 
         // Sweep touches
         self.perf.checks = 0;
-        let entities_count = self.with_world(|_, w: _| w.alloced());
+        let entities_count = w.alloced();
         for i in 0..entities_count {
-            let (ent1, ent1_bounds) = self.with_world(|_, w| {
-                let ent1 = w.get_nth(i).cloned().unwrap();
-                let ent1_bounds = w.get(ent1).unwrap().bounds();
-                (ent1, ent1_bounds)
-            });
-            let res = self.with_world(|_, w| {
+            let ent1 = w.get_nth(i).cloned().unwrap();
+            let (res, ent1_bounds) = {
                 let ent1 = w.get(ent1).unwrap();
-                !ent1.check_against.is_empty()
+                let res = !ent1.check_against.is_empty()
                     || !ent1.group.is_empty()
-                    || ent1.physics.is_at_least(EntPhysics::PASSIVE)
-            });
+                    || ent1.physics.is_at_least(EntPhysics::PASSIVE);
+
+                (res, ent1.bounds())
+            };
             if res {
                 let max_pos = sweep_axis.get(ent1_bounds.max);
                 for j in (i + 1)..entities_count {
-                    let (ent2, ent2_bounds) = self.with_world(|_, w| {
+                    let (ent2, ent2_bounds) = {
                         let ent2 = w.get_nth(j).cloned().unwrap();
                         let ent2_bounds = w.get(ent2).unwrap().bounds();
                         (ent2, ent2_bounds)
-                    });
+                    };
                     if sweep_axis.get(ent2_bounds.min) > max_pos {
                         break;
                     }
                     self.perf.checks += 1;
                     if ent1_bounds.is_touching(&ent2_bounds) {
-                        let res = self.with_world(|_, w| {
+                        let res = {
                             let [ent1, ent2] = w.many([ent1, ent2]);
+
                             !(ent1.check_against & ent2.group).is_empty()
-                        });
+                        };
                         if res {
-                            with_ent(
-                                self,
-                                ent1,
-                                |eng: &mut Engine, ent1: EntRef, instance: &mut dyn EntType| {
-                                    instance.touch(eng, ent1, ent2);
-                                },
-                            );
+                            w.with_ent(ent1, |w, ent1: EntRef, instance: &mut dyn EntType| {
+                                instance.touch(self, w, ent1, ent2);
+                            });
                         }
-                        let res = self.with_world(|_, w| {
+                        let res = {
                             let [ent1, ent2] = w.many([ent1, ent2]);
                             !(ent1.group & ent2.check_against).is_empty()
-                        });
+                        };
                         if res {
-                            with_ent(
-                                self,
-                                ent2,
-                                |eng: &mut Engine, ent2: EntRef, instance: &mut dyn EntType| {
-                                    instance.touch(eng, ent2, ent1);
-                                },
-                            );
+                            w.with_ent(ent2, |w, ent2: EntRef, instance: &mut dyn EntType| {
+                                instance.touch(self, w, ent2, ent1);
+                            });
                         }
 
-                        let res = self.with_world(|_, w| {
+                        let res = {
                             let [ent1, ent2] = w.many([ent1, ent2]);
                             ent1.physics.bits() >= EntCollidesMode::LITE.bits()
                                 && ent2.physics.bits() >= EntCollidesMode::LITE.bits()
                                 && ent1.physics.bits().saturating_add(ent2.physics.bits())
                                     >= (EntCollidesMode::ACTIVE | EntCollidesMode::LITE).bits()
                                 && (ent1.mass + ent2.mass) > 0.0
-                        });
+                        };
                         if res {
-                            resolve_collision(self, ent1, ent2);
+                            resolve_collision(self, w, ent1, ent2);
                         }
                     }
                 }
             }
         }
-        self.perf.entities = self.with_world(|_, w| w.alloced());
+        self.perf.entities = w.alloced();
     }
 
     /// Called per frame, the main update logic of engine
     pub(crate) fn update(&mut self) {
+        let world = unsafe { self.world.get().as_mut().unwrap() };
+        self.inner_update(world);
+    }
+
+    pub(crate) fn inner_update(&mut self, w: &mut World) {
         let time_frame_start = self.now();
 
         if self.scene_next.is_some() {
             self.is_running = false;
             if let Some(mut scene) = self.scene.take() {
-                scene.cleanup(self);
+                scene.cleanup(self, w);
             }
 
-            self.with_world(|_, mut w| {
-                w.reset_entities();
-            });
+            w.reset_entities();
 
             self.background_maps.clear();
             self.collision_map = None;
@@ -517,7 +490,7 @@ impl Engine {
             self.camera.viewport = Vec2::new(0., 0.);
 
             if let Some(mut scene) = self.scene_next.take() {
-                scene.init(self);
+                scene.init(self, w);
                 self.scene = Some(scene);
             }
         }
@@ -531,34 +504,32 @@ impl Engine {
         self.frame += 1.;
 
         if let Some(mut scene) = self.scene.take() {
-            scene.update(self);
+            scene.update(self, w);
             self.scene = Some(scene);
         } else {
-            self.scene_base_update();
+            self.scene_base_update(w);
         }
 
         // handle_commands
-        self.handle_commands();
+        self.handle_commands(w);
 
         // Update camera
-        self.with_world(|eng, w| {
-            let camera_follow = eng.camera.follow.and_then(|ent_ref| w.get(ent_ref));
-            let bounds = eng.collision_map.as_ref().map(|map| map.bounds());
-            eng.camera.update(
-                eng.tick,
-                eng.render.borrow().logical_size(),
-                camera_follow,
-                bounds,
-            );
-        });
+        let camera_follow = self.camera.follow.and_then(|ent_ref| w.get(ent_ref));
+        let bounds = self.collision_map.as_ref().map(|map| map.bounds());
+        self.camera.update(
+            self.tick,
+            self.render.borrow().logical_size(),
+            camera_follow,
+            bounds,
+        );
 
         self.perf.update = self.now() - time_real_now;
 
         if let Some(mut scene) = self.scene.take() {
-            scene.draw(self);
+            scene.draw(self, w);
             self.scene = Some(scene);
         } else {
-            self.scene_base_draw();
+            self.scene_base_draw(w);
         }
 
         self.perf.draw = (self.now() - time_real_now) - self.perf.update;
@@ -593,11 +564,14 @@ impl Engine {
     }
 
     /// Load level
-    pub fn load_level(&mut self, proj: &LdtkProject, identifier: &str) -> Result<()> {
+    pub fn load_level(
+        &mut self,
+        w: &mut World,
+        proj: &LdtkProject,
+        identifier: &str,
+    ) -> Result<()> {
         let level = proj.get_level(identifier)?;
-        self.with_world(|_, mut w| {
-            w.reset_entities();
-        });
+        w.reset_entities();
         self.background_maps.clear();
         self.collision_map.take();
         self.commands.take();
@@ -628,13 +602,15 @@ impl Engine {
                             (ent_ins.px.0 + ent_ins.width / 2) as f32,
                             (ent_ins.px.1 + ent_ins.height / 2) as f32,
                         );
-                        let ent_ref = self.spawn_with_type_name(ent_ins.identifier.clone(), pos);
-                        self.with_world(|_, mut w| {
+                        let ent_ref = {
+                            let ent_ref =
+                                self.spawn_with_type_name(w, ent_ins.identifier.clone(), pos);
                             if let Some(ent) = w.get_mut(ent_ref) {
                                 ent.size.x = ent_ins.width as f32;
                                 ent.size.y = ent_ins.height as f32;
                             }
-                        });
+                            ent_ref
+                        };
                         let settings = ent_ins
                             .field_instances
                             .iter()
@@ -684,7 +660,7 @@ impl Engine {
 
     /// Kill an entity
     pub fn kill(&mut self, ent: EntRef) {
-        self.commands.add(Command::KillEntity { ent });
+        self.commands.add(Command::KillEnt { ent });
     }
 
     /// Damage an entity
@@ -711,36 +687,26 @@ impl Engine {
         entity_move(self, ent, vstep);
     }
 
-    pub(crate) fn handle_commands(&mut self) {
+    fn handle_commands(&mut self, w: &mut World) {
         let commands = self.commands.take();
         for command in commands {
             match command {
                 Command::Collide { ent, normal, trace } => {
-                    with_ent(
-                        self,
-                        ent,
-                        |eng: &mut Engine, ent_ref: EntRef, instance: &mut dyn EntType| {
-                            instance.collide(eng, ent_ref, normal, trace.as_ref());
-                        },
-                    );
+                    w.with_ent(ent, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
+                        instance.collide(self, w, ent_ref, normal, trace.as_ref());
+                    });
                 }
                 Command::Setting { ent, settings } => {
-                    with_ent(
-                        self,
-                        ent,
-                        |eng: &mut Engine, ent_ref: EntRef, instance: &mut dyn EntType| {
-                            instance.settings(eng, ent_ref, settings);
-                        },
-                    );
+                    w.with_ent(ent, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
+                        instance.settings(self, w, ent_ref, settings);
+                    });
                 }
-                Command::KillEntity { ent } => {
-                    self.with_world(|_, mut w| {
+                Command::KillEnt { ent } => {
+                    w.with_ent(ent, |w, ent, instance| {
                         if let Some(ent) = w.get_mut(ent) {
                             ent.alive = false;
                         }
-                    });
-                    with_ent(self, ent, |eng, ent, instance| {
-                        instance.kill(eng, ent);
+                        instance.kill(self, w, ent);
                     });
                 }
                 Command::Damage {
@@ -748,18 +714,18 @@ impl Engine {
                     by_ent,
                     damage,
                 } => {
-                    with_ent(self, ent, |eng, ent, instance| {
-                        instance.damage(eng, ent, by_ent, damage);
+                    w.with_ent(ent, |w, ent, instance| {
+                        instance.damage(self, w, ent, by_ent, damage);
                     });
                 }
                 Command::Trigger { ent, other } => {
-                    with_ent(self, ent, |eng, ent, instance| {
-                        instance.trigger(eng, ent, other);
+                    w.with_ent(ent, |w, ent, instance| {
+                        instance.trigger(self, w, ent, other);
                     });
                 }
                 Command::Message { ent, data } => {
-                    with_ent(self, ent, |eng, ent, instance| {
-                        instance.message(eng, ent, data);
+                    w.with_ent(ent, |w, ent, instance| {
+                        instance.message(self, w, ent, data);
                     });
                 }
             }

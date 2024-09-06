@@ -20,6 +20,7 @@ use crate::{
     handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
     types::Rect,
+    world::World,
 };
 
 use super::Platform;
@@ -153,7 +154,7 @@ impl Platform for SDLPlatform {
         self.textures.remove(&handle_id);
     }
 
-    async fn run<Setup: FnOnce(&mut Engine)>(
+    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(
         title: String,
         width: u32,
         height: u32,
@@ -196,11 +197,10 @@ impl Platform for SDLPlatform {
             let platform = SDLPlatform::new(screen_buffer);
             Engine::new(Box::new(platform))
         };
-        setup(&mut engine);
 
         // Obtained samplerate might be different from requested
         // platform_output_samplerate = obtained_spec.freq;
-        engine.init();
+        engine.init(setup);
         engine
             .render
             .borrow_mut()

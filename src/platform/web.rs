@@ -22,6 +22,7 @@ use crate::{
     handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
     types::Rect,
+    world::World,
 };
 
 use super::Platform;
@@ -256,7 +257,7 @@ impl Platform for WebPlatform {
         ((now - self.start) / 1000.0) as f32
     }
 
-    async fn run<Setup: FnOnce(&mut crate::prelude::Engine)>(
+    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(
         _title: String,
         width: u32,
         height: u32,
@@ -410,8 +411,7 @@ impl Platform for WebPlatform {
             Engine::new(Box::new(platform))
         };
 
-        setup(&mut engine);
-        engine.init();
+        engine.init(setup);
 
         engine.render.borrow_mut().resize(size);
 

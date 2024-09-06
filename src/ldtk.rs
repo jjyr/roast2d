@@ -19,11 +19,11 @@ impl LdtkProject {
         self.defs.tilesets.iter().find(|t| t.uid == uid)
     }
 
-    pub fn get_entity(&self, uid: u32) -> Option<&LdtkEntity> {
+    pub fn get_entity(&self, uid: u32) -> Option<&LdtkEnt> {
         self.defs.entities.iter().find(|e| e.uid == uid)
     }
 
-    pub fn get_entity_by_name(&self, identifier: &str) -> Option<&LdtkEntity> {
+    pub fn get_entity_by_name(&self, identifier: &str) -> Option<&LdtkEnt> {
         self.defs
             .entities
             .iter()
@@ -46,7 +46,7 @@ impl LdtkProject {
 #[serde(rename_all = "camelCase")]
 pub struct LdtkDefs {
     pub layers: Vec<LdtkLayer>,
-    pub entities: Vec<LdtkEntity>,
+    pub entities: Vec<LdtkEnt>,
     pub tilesets: Vec<LdtkTileset>,
     pub enums: Vec<LdtkEnum>,
     pub level_fields: Vec<LdtkLevelField>,
@@ -71,7 +71,7 @@ pub struct LdtkLayer {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LdtkEntity {
+pub struct LdtkEnt {
     pub identifier: String,
     pub uid: u32,
     pub width: usize,
@@ -239,7 +239,7 @@ pub struct LdtkLevelLayerInstance {
     pub iid: String,
     pub level_id: usize,
     pub layer_def_uid: usize,
-    pub entity_instances: Vec<LdtkEntityInstance>,
+    pub entity_instances: Vec<LdtkEntInstance>,
     pub auto_layer_tiles: Vec<LdtkTile>,
     pub grid_tiles: Vec<LdtkTile>,
     pub int_grid_csv: Vec<u16>,
@@ -250,7 +250,7 @@ pub type LdtkGridF = (f32, f32);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct LdtkEntityInstance {
+pub struct LdtkEntInstance {
     #[serde(rename = "__identifier")]
     pub identifier: String,
     pub iid: String,
@@ -267,7 +267,7 @@ pub struct LdtkEntityInstance {
     pub field_instances: Vec<LdtkFieldInstance>,
 }
 
-impl LdtkEntityInstance {
+impl LdtkEntInstance {
     pub fn get_field(&self, identifier: &str) -> Option<&LdtkFieldInstance> {
         self.field_instances
             .iter()

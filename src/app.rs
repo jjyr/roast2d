@@ -1,7 +1,7 @@
 use anyhow::Result;
 use glam::UVec2;
 
-use crate::{engine::Engine, platform::platform_run};
+use crate::{engine::Engine, platform::platform_run, world::World};
 
 #[derive(Debug)]
 pub struct App {
@@ -37,7 +37,7 @@ impl App {
     }
 
     /// Run the game
-    pub async fn run<Setup: FnOnce(&mut Engine)>(self, setup: Setup) -> Result<()> {
+    pub async fn run<Setup: FnOnce(&mut Engine, &mut World)>(self, setup: Setup) -> Result<()> {
         let App {
             title,
             window: UVec2 {

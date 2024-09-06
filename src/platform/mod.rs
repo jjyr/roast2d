@@ -6,6 +6,7 @@ use crate::{
     engine::Engine,
     handle::{Handle, HandleId},
     types::Rect,
+    world::World,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -32,7 +33,7 @@ pub trait Platform {
     fn create_texture(&mut self, handle: Handle, data: Vec<u8>, size: UVec2);
     fn remove_texture(&mut self, handle_id: HandleId);
     #[allow(async_fn_in_trait)]
-    async fn run<Setup: FnOnce(&mut Engine)>(
+    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(
         title: String,
         width: u32,
         height: u32,
@@ -43,7 +44,7 @@ pub trait Platform {
         Self: Sized;
 }
 
-pub(crate) async fn platform_run<Setup: FnOnce(&mut crate::prelude::Engine)>(
+pub(crate) async fn platform_run<Setup: FnOnce(&mut Engine, &mut World)>(
     title: String,
     width: u32,
     height: u32,
