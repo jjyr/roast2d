@@ -113,21 +113,14 @@ impl Platform for SDLPlatform {
             return;
         };
 
+        let angle = angle.unwrap_or_default().to_degrees();
         let src: Option<sdl2::rect::Rect> = src.map(Into::into);
         let dst: sdl2::rect::Rect = dst.into();
         texture.set_color_mod(color.r, color.g, color.b);
 
         self.screen_buffer
             .canvas
-            .copy_ex(
-                texture,
-                src,
-                dst,
-                angle.unwrap_or_default().into(),
-                None,
-                flip_x,
-                flip_y,
-            )
+            .copy_ex(texture, src, dst, angle.into(), None, flip_x, flip_y)
             .unwrap();
     }
 

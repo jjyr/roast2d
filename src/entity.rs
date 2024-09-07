@@ -98,6 +98,7 @@ impl From<TypeId> for EntTypeId {
 
 /// Entity
 pub struct Ent {
+    /// Unique EntRef
     pub ent_ref: EntRef,
     pub alive: bool,
     pub on_ground: bool,
@@ -108,6 +109,7 @@ pub struct Ent {
     pub check_against: EntGroup,
     pub pos: Vec2,
     pub scale: Vec2,
+    /// Angle in radians
     pub angle: f32,
     pub size: Vec2,
     pub vel: Vec2,

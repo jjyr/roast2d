@@ -206,7 +206,7 @@ impl Platform for WebPlatform {
             // move to center
             self.buf.translate(dw_hf, dh_hf).unwrap();
             // rotate counter clockwise
-            self.buf.rotate((-angle as f64).to_radians()).unwrap();
+            self.buf.rotate(-angle as f64).unwrap();
             self.buf.translate(-dw_hf, -dh_hf).unwrap();
         }
         self.buf
