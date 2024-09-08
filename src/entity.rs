@@ -406,7 +406,8 @@ pub(crate) fn entities_separate_on_y_axis(
     }
 }
 
-pub(crate) fn entity_move(eng: &mut Engine, ent: &mut Ent, vstep: Vec2) {
+// Move entity
+pub fn entity_move(eng: &mut Engine, ent: &mut Ent, vstep: Vec2) {
     if ent.physics.contains(EntPhysics::WORLD) && eng.collision_map.is_some() {
         let map = eng.collision_map.as_ref().unwrap();
         let t = trace(map, ent.pos, vstep, ent.scaled_size());
