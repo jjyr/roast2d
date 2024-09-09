@@ -10,12 +10,10 @@ use glam::{UVec2, Vec2};
 use crate::{
     asset::{AssetManager, FetchedTask},
     camera::Camera,
+    collision::{entity_move, resolve_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
     commands::{Command, Commands},
-    entity::{
-        entity_move, resolve_collision, Ent, EntCollidesMode, EntPhysics, EntRef, EntType,
-        EntTypeId,
-    },
+    entity::{Ent, EntCollidesMode, EntPhysics, EntRef, EntType, EntTypeId},
     font::Text,
     handle::Handle,
     input::InputState,
