@@ -115,6 +115,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_sat_collide_not_rotate() {
+        let rect1 = SatRect {
+            pos: Vec2 { x: 0.0, y: 0.0 },
+            half_size: Vec2 { x: 40.0, y: 40.0 },
+            angle: 0.0,
+        };
+
+        let rect2 = SatRect {
+            pos: Vec2 { x: 50.0, y: 50.0 },
+            half_size: Vec2 { x: 40.0, y: 40.0 },
+            angle: 0.0,
+        };
+
+        let overlap = sat_collision_overlap(&rect1, &rect2).expect("overlap");
+        // KNOWN ISSUE, This should be Vec2(30.0, 30.0)
+        // we only record 1 axis so we only get 1 accurate overlap
+        // To fix this, we should store the minimum x and y axes
+        assert_eq!(overlap, Vec2::new(0.0, 30.0));
+    }
+
+    #[test]
     fn test_sat_collide() {
         let rect1 = SatRect {
             pos: Vec2 { x: 0.0, y: 0.0 },
