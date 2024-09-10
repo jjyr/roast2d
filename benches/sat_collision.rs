@@ -17,7 +17,7 @@ fn sat_collide(n: usize) {
 
     for i in 0..n {
         for _j in (i + 1)..n {
-            let overlap = sat_collision_overlap(&rect1, &rect2);
+            let overlap = calc_sat_overlap(&rect1, &rect2);
             debug_assert!(overlap.is_some());
         }
     }

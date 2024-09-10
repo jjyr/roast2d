@@ -71,7 +71,7 @@ fn calc_overlap(proj1: Projection, proj2: Projection) -> Option<f32> {
 }
 
 // SAT collision overlap
-pub fn sat_collision_overlap(rect1: &SatRect, rect2: &SatRect) -> Option<Vec2> {
+pub fn calc_sat_overlap(rect1: &SatRect, rect2: &SatRect) -> Option<Vec2> {
     let vs1 = rect1.get_vertices();
     let vs2 = rect2.get_vertices();
 
@@ -104,10 +104,13 @@ pub fn sat_collision_overlap(rect1: &SatRect, rect2: &SatRect) -> Option<Vec2> {
     }
 
     // return overlap on x, y
-    Some(Vec2 {
-        x: min_axis.x * min_overlap,
-        y: min_axis.y * min_overlap,
-    })
+    Some(
+        Vec2 {
+            x: min_axis.x * min_overlap,
+            y: min_axis.y * min_overlap,
+        }
+        .abs(),
+    )
 }
 
 #[cfg(test)]
@@ -128,7 +131,7 @@ mod tests {
             angle: 0.0,
         };
 
-        let overlap = sat_collision_overlap(&rect1, &rect2).expect("overlap");
+        let overlap = calc_sat_overlap(&rect1, &rect2).expect("overlap");
         // KNOWN ISSUE, This should be Vec2(30.0, 30.0)
         // we only record 1 axis so we only get 1 accurate overlap
         // To fix this, we should store the minimum x and y axes
@@ -149,7 +152,7 @@ mod tests {
             angle: 0.5,
         };
 
-        let overlap = sat_collision_overlap(&rect1, &rect2).expect("overlap");
+        let overlap = calc_sat_overlap(&rect1, &rect2).expect("overlap");
         assert_eq!(overlap, Vec2::new(2.5097463, 1.3710803));
     }
 
@@ -167,7 +170,7 @@ mod tests {
             angle: 0.5,
         };
 
-        let overlap = sat_collision_overlap(&rect1, &rect2);
+        let overlap = calc_sat_overlap(&rect1, &rect2);
         assert_eq!(overlap, None);
     }
 }
