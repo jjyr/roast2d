@@ -7,6 +7,7 @@ const ENTITY_MIN_BOUNCE_VELOCITY: f32 = 10.0;
 use crate::{
     engine::Engine,
     entity::{Ent, EntCollidesMode, EntPhysics, EntRef},
+    sat::{calc_sat_overlap, SatRect},
     trace::{trace, Trace},
     types::Rect,
     world::World,
@@ -39,20 +40,21 @@ pub fn entity_move(eng: &mut Engine, ent: &mut Ent, vstep: Vec2) {
 }
 
 /// Resolve entity collision
-pub(crate) fn resolve_collision(eng: &mut Engine, w: &mut World, a: EntRef, b: EntRef) {
+pub(crate) fn resolve_collision(
+    eng: &mut Engine,
+    w: &mut World,
+    a: EntRef,
+    b: EntRef,
+    overlap: Vec2,
+) {
     let [a, b] = w.many_mut([a, b]);
     let a_bound = a.bounds();
     let b_bound = b.bounds();
-    let overlap_x: f32 = if a_bound.min.x < b_bound.min.x {
-        a_bound.max.x - b_bound.min.x
-    } else {
-        b_bound.max.x - a_bound.min.x
-    };
-    let overlap_y: f32 = if a_bound.min.y < b_bound.min.y {
-        a_bound.max.y - b_bound.min.y
-    } else {
-        b_bound.max.y - a_bound.min.y
-    };
+
+    let Vec2 {
+        x: overlap_x,
+        y: overlap_y,
+    } = overlap;
 
     let a_move;
     let b_move;
@@ -220,18 +222,18 @@ pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
         Rect { min, max }
     } else {
         let rot = Vec2::from_angle(angle);
-        let p1 = pos + Vec2::new(half_size.x, -half_size.y);
-        let p2 = pos + half_size;
-        let p3 = pos + Vec2::new(-half_size.x, half_size.y);
-        let p4 = pos - half_size;
+        let p1 = Vec2::new(half_size.x, -half_size.y);
+        let p2 = half_size;
+        let p3 = Vec2::new(-half_size.x, half_size.y);
+        let p4 = -half_size;
         if angle > 0. && angle < HF_PI {
             let max_x = rot.rotate(p1).x;
             let min_x = rot.rotate(p3).x;
             let max_y = rot.rotate(p2).y;
             let min_y = rot.rotate(p4).y;
             Rect {
-                min: Vec2::new(min_x, min_y),
-                max: Vec2::new(max_x, max_y),
+                min: pos + Vec2::new(min_x, min_y),
+                max: pos + Vec2::new(max_x, max_y),
             }
         } else if angle > HF_PI && angle < PI {
             let max_x = rot.rotate(p4).x;
@@ -239,8 +241,8 @@ pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
             let max_y = rot.rotate(p1).y;
             let min_y = rot.rotate(p3).y;
             Rect {
-                min: Vec2::new(min_x, min_y),
-                max: Vec2::new(max_x, max_y),
+                min: pos + Vec2::new(min_x, min_y),
+                max: pos + Vec2::new(max_x, max_y),
             }
         } else if angle > -PI && angle < -HF_PI {
             let max_x = rot.rotate(p3).x;
@@ -248,8 +250,8 @@ pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
             let max_y = rot.rotate(p4).y;
             let min_y = rot.rotate(p2).y;
             Rect {
-                min: Vec2::new(min_x, min_y),
-                max: Vec2::new(max_x, max_y),
+                min: pos + Vec2::new(min_x, min_y),
+                max: pos + Vec2::new(max_x, max_y),
             }
         } else if angle > -HF_PI && angle < 0.0 {
             let max_x = rot.rotate(p2).x;
@@ -257,12 +259,50 @@ pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
             let max_y = rot.rotate(p3).y;
             let min_y = rot.rotate(p1).y;
             Rect {
-                min: Vec2::new(min_x, min_y),
-                max: Vec2::new(max_x, max_y),
+                min: pos + Vec2::new(min_x, min_y),
+                max: pos + Vec2::new(max_x, max_y),
             }
         } else {
             panic!("Unnormalized angle {angle}")
         }
+    }
+}
+
+pub(crate) fn calc_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<Vec2> {
+    let [ent1, ent2] = w.many([ent1, ent2]);
+    // check bounds
+    let b1 = ent1.bounds();
+    let b2 = ent2.bounds();
+    if !b1.is_touching(&b2) {
+        return None;
+    }
+    // test if ent is rotated
+    if ent1.angle == 0.0 || ent1.angle.abs() == PI {
+        // not rotated, calculate overlap with bounds
+        let overlap_x: f32 = if b1.min.x < b2.min.x {
+            b1.max.x - b2.min.x
+        } else {
+            b2.max.x - b1.min.x
+        };
+        let overlap_y: f32 = if b1.min.y < b2.min.y {
+            b1.max.y - b2.min.y
+        } else {
+            b2.max.y - b1.min.y
+        };
+        Some(Vec2::new(overlap_x, overlap_y))
+    } else {
+        // rotated, perform sat check
+        let rect1 = SatRect {
+            angle: ent1.angle,
+            pos: ent1.pos,
+            half_size: ent1.scaled_size() * 0.5,
+        };
+        let rect2 = SatRect {
+            angle: ent2.angle,
+            pos: ent2.pos,
+            half_size: ent2.scaled_size() * 0.5,
+        };
+        calc_sat_overlap(&rect1, &rect2)
     }
 }
 
@@ -354,13 +394,25 @@ mod tests {
         let b1 = calc_bounds(Vec2::ZERO, half_size, -120.0f32.to_radians());
 
         assert_eq!(b1.min, -b1.max);
-        assert!(b1.max.y > 2.2);
-        assert!(b1.max.x > 1.8);
         assert_eq!(
             b1,
             Rect {
                 min: Vec2::new(-1.8660254, -2.232051),
                 max: Vec2::new(1.8660254, 2.232051),
+            }
+        );
+    }
+
+    #[test]
+    fn test_calc_bounds_non_center() {
+        let half_size = Vec2::new(2.0, 1.0);
+        let b1 = calc_bounds(Vec2::splat(100.0), half_size, -120.0f32.to_radians());
+
+        assert_eq!(
+            b1,
+            Rect {
+                min: Vec2::splat(100.0) + Vec2::new(-1.8660254, -2.232051),
+                max: Vec2::splat(100.0) + Vec2::new(1.8660254, 2.232051),
             }
         );
     }

@@ -10,7 +10,7 @@ use glam::{UVec2, Vec2};
 use crate::{
     asset::{AssetManager, FetchedTask},
     camera::Camera,
-    collision::{entity_move, resolve_collision},
+    collision::{calc_overlap, entity_move, resolve_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
     commands::{Command, Commands},
     entity::{Ent, EntCollidesMode, EntPhysics, EntRef, EntType, EntTypeId},
@@ -425,7 +425,7 @@ impl Engine {
                         break;
                     }
                     self.perf.checks += 1;
-                    if ent1_bounds.is_touching(&ent2_bounds) {
+                    if let Some(overlap) = calc_overlap(w, ent1, ent2) {
                         let res = {
                             let [ent1, ent2] = w.many([ent1, ent2]);
 
@@ -455,7 +455,7 @@ impl Engine {
                                 && (ent1.mass + ent2.mass) > 0.0
                         };
                         if res {
-                            resolve_collision(self, w, ent1, ent2);
+                            resolve_collision(self, w, ent1, ent2, overlap);
                         }
                     }
                 }
