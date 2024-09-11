@@ -1,6 +1,10 @@
 use glam::{IVec2, Vec2};
 
-use crate::prelude::CollisionMap;
+use crate::{
+    collision::is_right_angle,
+    prelude::CollisionMap,
+    sat::{calc_sat_overlap, SatRect},
+};
 
 #[derive(Debug, Clone)]
 pub struct Trace {
@@ -33,7 +37,13 @@ impl Default for Trace {
     }
 }
 
-pub(crate) fn trace(map: &CollisionMap, from_center: Vec2, vel: Vec2, size: Vec2) -> Trace {
+pub(crate) fn trace(
+    map: &CollisionMap,
+    from_center: Vec2,
+    vel: Vec2,
+    size: Vec2,
+    angle: f32,
+) -> Trace {
     let half_size = size * 0.5;
     let from = from_center - half_size;
     let to = from + vel;
@@ -72,9 +82,19 @@ pub(crate) fn trace(map: &CollisionMap, from_center: Vec2, vel: Vec2, size: Vec2
 
     let mut last_tile_pos = IVec2::splat(-16);
     let mut extra_step_for_slope = false;
+
+    // used to perform sat collision
+    let sat_rect = SatRect {
+        angle,
+        pos: from_center,
+        half_size,
+    };
+    let tile_hf_size = Vec2::splat(map.tile_size * 0.5);
+    let is_right_angle = is_right_angle(angle);
     for i in 0..=(steps as usize) {
         let tile_pos: IVec2 = {
-            let p = (corner + step_size * i as f32) / map.tile_size;
+            let tile_px = corner + step_size * i as f32;
+            let p = tile_px / map.tile_size;
             IVec2::new(p.x as i32, p.y as i32)
         };
 
@@ -93,14 +113,23 @@ pub(crate) fn trace(map: &CollisionMap, from_center: Vec2, vel: Vec2, size: Vec2
                 .abs()
                 .ceil() as i32;
             for t in 0..num_tiles {
-                check_tile(
-                    map,
-                    from,
-                    vel,
-                    size,
-                    IVec2::new(tile_pos.x, tile_pos.y + dir.y as i32 * t),
-                    &mut res,
-                );
+                let tile_pos = IVec2::new(tile_pos.x, tile_pos.y + dir.y as i32 * t);
+                if !is_right_angle {
+                    let pos = Vec2::new(
+                        (tile_pos.x as f32) * map.tile_size + tile_hf_size.x,
+                        (tile_pos.y as f32) * map.tile_size + tile_hf_size.y,
+                    );
+                    // check tile collision with sat
+                    let tile_rect = SatRect {
+                        angle: 0.0,
+                        half_size: tile_hf_size,
+                        pos,
+                    };
+                    if calc_sat_overlap(&sat_rect, &tile_rect).is_none() {
+                        continue;
+                    }
+                }
+                check_tile(map, from, vel, size, tile_pos, &mut res);
             }
 
             last_tile_pos.x = tile_pos.x;
@@ -121,14 +150,23 @@ pub(crate) fn trace(map: &CollisionMap, from_center: Vec2, vel: Vec2, size: Vec2
                 .abs()
                 .ceil() as i32;
             for t in corner_tile_checked..num_tiles {
-                check_tile(
-                    map,
-                    from,
-                    vel,
-                    size,
-                    IVec2::new(tile_pos.x + dir.x as i32 * t, tile_pos.y),
-                    &mut res,
-                );
+                let tile_pos = IVec2::new(tile_pos.x + dir.x as i32 * t, tile_pos.y);
+                if !is_right_angle {
+                    let pos = Vec2::new(
+                        (tile_pos.x as f32) * map.tile_size + tile_hf_size.x,
+                        (tile_pos.y as f32) * map.tile_size + tile_hf_size.y,
+                    );
+                    // check tile collision with sat
+                    let tile_rect = SatRect {
+                        angle: 0.0,
+                        half_size: tile_hf_size,
+                        pos,
+                    };
+                    if calc_sat_overlap(&sat_rect, &tile_rect).is_none() {
+                        continue;
+                    }
+                }
+                check_tile(map, from, vel, size, tile_pos, &mut res);
             }
 
             last_tile_pos.y = tile_pos.y;

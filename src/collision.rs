@@ -17,7 +17,7 @@ use crate::{
 pub fn entity_move(eng: &mut Engine, ent: &mut Ent, vstep: Vec2) {
     if ent.physics.contains(EntPhysics::WORLD) && eng.collision_map.is_some() {
         let map = eng.collision_map.as_ref().unwrap();
-        let t = trace(map, ent.pos, vstep, ent.scaled_size());
+        let t = trace(map, ent.pos, vstep, ent.scaled_size(), ent.angle);
         handle_trace_result(eng, ent, t.clone());
         // The previous trace was stopped short and we still have some velocity
         // left? Do a second trace with the new velocity. this allows us
@@ -30,7 +30,7 @@ pub fn entity_move(eng: &mut Engine, ent: &mut Ent, vstep: Vec2) {
                 let remaining = 1. - t.length;
                 let vstep2 = rotated_normal * (vel_along_normal * remaining);
                 let map = eng.collision_map.as_ref().unwrap();
-                let t2 = trace(map, ent.pos, vstep2, ent.scaled_size());
+                let t2 = trace(map, ent.pos, vstep2, ent.scaled_size(), ent.angle);
                 handle_trace_result(eng, ent, t2);
             }
         }
@@ -208,7 +208,7 @@ fn handle_trace_result(eng: &mut Engine, ent: &mut Ent, t: Trace) {
 pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
     const HF_PI: f32 = PI * 0.5;
 
-    if angle == 0. || angle.abs() == PI {
+    if angle == 0.0 || angle.abs() == PI {
         let min = pos - half_size;
         let max = pos + half_size;
         Rect { min, max }
@@ -277,7 +277,7 @@ pub(crate) fn calc_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<
         return None;
     }
     // test if ent is rotated
-    if ent1.angle == 0.0 || ent1.angle.abs() == PI {
+    if is_right_angle(ent1.angle) {
         // not rotated, calculate overlap with bounds
         let overlap_x: f32 = if b1.min.x < b2.min.x {
             b1.max.x - b2.min.x
@@ -304,6 +304,14 @@ pub(crate) fn calc_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<
         };
         calc_sat_overlap(&rect1, &rect2)
     }
+}
+
+pub(crate) fn is_right_angle(angle: f32) -> bool {
+    if angle == 0.0 {
+        return true;
+    }
+    let a = angle.abs();
+    a == PI || a == PI * 0.5
 }
 
 #[cfg(test)]
