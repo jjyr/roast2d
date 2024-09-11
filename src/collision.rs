@@ -73,7 +73,14 @@ pub(crate) fn resolve_collision(
     }
 
     if overlap_y > overlap_x {
-        let overlap_x = overlap_x.max(overlap_y * 0.5);
+        let overlap_x = if overlap_x == 0.0 {
+            let a_bounds = a.bounds();
+            let b_bounds = b.bounds();
+            ((a_bounds.max.x - a_bounds.min.x).min(b_bounds.max.x - b_bounds.min.x) * 0.5)
+                .min(overlap_y * 0.5)
+        } else {
+            overlap_x
+        };
         if a.pos.x < b.pos.x {
             entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
             eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
@@ -84,7 +91,14 @@ pub(crate) fn resolve_collision(
             eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
         }
     } else if a.pos.y < b.pos.y {
-        let overlap_y = overlap_y.max(overlap_x * 0.5);
+        let overlap_y = if overlap_y == 0.0 {
+            let a_bounds = a.bounds();
+            let b_bounds = b.bounds();
+            ((a_bounds.max.y - a_bounds.min.y).min(b_bounds.max.y - b_bounds.min.y) * 0.5)
+                .min(overlap_x * 0.5)
+        } else {
+            overlap_y
+        };
         entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
         eng.collide(a.ent_ref, Vec2::new(0.0, -1.0), None);
         eng.collide(b.ent_ref, Vec2::new(0.0, 1.0), None);
