@@ -48,8 +48,6 @@ pub(crate) fn resolve_collision(
     overlap: Vec2,
 ) {
     let [a, b] = w.many_mut([a, b]);
-    let a_bound = a.bounds();
-    let b_bound = b.bounds();
 
     let Vec2 {
         x: overlap_x,
@@ -75,7 +73,8 @@ pub(crate) fn resolve_collision(
     }
 
     if overlap_y > overlap_x {
-        if a_bound.min.x < b_bound.min.x {
+        let overlap_x = overlap_x.max(overlap_y * 0.5);
+        if a.pos.x < b.pos.x {
             entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x);
             eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
             eng.collide(b.ent_ref, Vec2::new(1.0, 0.0), None);
@@ -84,7 +83,8 @@ pub(crate) fn resolve_collision(
             eng.collide(a.ent_ref, Vec2::new(1.0, 0.0), None);
             eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
         }
-    } else if a_bound.min.y < b_bound.min.y {
+    } else if a.pos.y < b.pos.y {
+        let overlap_y = overlap_y.max(overlap_x * 0.5);
         entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y, eng.tick);
         eng.collide(a.ent_ref, Vec2::new(0.0, -1.0), None);
         eng.collide(b.ent_ref, Vec2::new(0.0, 1.0), None);
@@ -277,7 +277,7 @@ pub(crate) fn calc_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<
         return None;
     }
     // test if ent is rotated
-    if is_right_angle(ent1.angle) {
+    if is_right_angle(ent1.angle) && is_right_angle(ent2.angle) {
         // not rotated, calculate overlap with bounds
         let overlap_x: f32 = if b1.min.x < b2.min.x {
             b1.max.x - b2.min.x
