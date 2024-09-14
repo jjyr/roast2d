@@ -103,14 +103,18 @@ pub fn calc_sat_overlap(rect1: &SatRect, rect2: &SatRect) -> Option<Vec2> {
         }
     }
 
+    // make sure the vector is pointing from shape1 to shape2
+    let dir = rect2.pos - rect1.pos;
+    if dir.dot(min_axis) < 0. {
+        // negate the normal if its not
+        min_axis = -min_axis;
+    }
+
     // return overlap on x, y
-    Some(
-        Vec2 {
-            x: min_axis.x * min_overlap,
-            y: min_axis.y * min_overlap,
-        }
-        .abs(),
-    )
+    Some(Vec2 {
+        x: min_axis.x * min_overlap,
+        y: min_axis.y * min_overlap,
+    })
 }
 
 #[cfg(test)]
