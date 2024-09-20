@@ -107,6 +107,7 @@ pub(crate) fn entities_separate_on_x_axis(
         if bounce > ENTITY_MIN_BOUNCE_VELOCITY {
             left.vel.x -= bounce;
         }
+
         entity_move(eng, left, Vec2::new(-overlap * left_move, 0.0));
     }
 
@@ -163,10 +164,10 @@ pub(crate) fn entities_separate_on_y_axis(
 fn handle_trace_result(eng: &mut Engine, ent: &mut Ent, t: Trace) {
     ent.pos = t.pos;
 
-    // FIXME call check collision rule
-    if t.tile == 0 {
+    if !t.is_collide {
         return;
     }
+    ent.vel = Vec2::ZERO;
 
     eng.collide(ent.ent_ref, t.normal, Some(t.clone()));
 
@@ -265,16 +266,37 @@ pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
     }
 }
 
-pub(crate) fn calc_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<Vec2> {
+pub(crate) fn calc_ent_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<Vec2> {
     let [ent1, ent2] = w.many([ent1, ent2]);
+    calc_overlap(
+        &Shape {
+            pos: ent1.pos,
+            angle: ent1.angle,
+            half_size: ent1.scaled_size() * 0.5,
+        },
+        &Shape {
+            pos: ent2.pos,
+            angle: ent2.angle,
+            half_size: ent2.scaled_size() * 0.5,
+        },
+    )
+}
+
+pub(crate) struct Shape {
+    pub pos: Vec2,
+    pub angle: f32,
+    pub half_size: Vec2,
+}
+
+pub(crate) fn calc_overlap(s1: &Shape, s2: &Shape) -> Option<Vec2> {
+    let b1 = calc_bounds(s1.pos, s1.half_size, s1.angle);
+    let b2 = calc_bounds(s2.pos, s2.half_size, s2.angle);
     // check bounds
-    let b1 = ent1.bounds();
-    let b2 = ent2.bounds();
     if !b1.is_touching(&b2) {
         return None;
     }
     // test if ent is rotated
-    if is_right_angle(ent1.angle) && is_right_angle(ent2.angle) {
+    if is_right_angle(s1.angle) && is_right_angle(s2.angle) {
         // not rotated, calculate overlap with bounds
         let overlap_x: f32 = if b1.min.x < b2.min.x {
             b1.max.x - b2.min.x
@@ -294,14 +316,14 @@ pub(crate) fn calc_overlap(w: &mut World, ent1: EntRef, ent2: EntRef) -> Option<
     } else {
         // rotated, perform sat check
         let rect1 = SatRect {
-            angle: ent1.angle,
-            pos: ent1.pos,
-            half_size: ent1.scaled_size() * 0.5,
+            angle: s1.angle,
+            pos: s1.pos,
+            half_size: s1.half_size,
         };
         let rect2 = SatRect {
-            angle: ent2.angle,
-            pos: ent2.pos,
-            half_size: ent2.scaled_size() * 0.5,
+            angle: s2.angle,
+            pos: s2.pos,
+            half_size: s2.half_size,
         };
         calc_sat_overlap(&rect1, &rect2)
     }

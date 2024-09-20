@@ -1,15 +1,14 @@
 use glam::{IVec2, Vec2};
 
 use crate::{
-    collision::is_right_angle,
+    collision::{calc_overlap, Shape},
     prelude::CollisionMap,
-    sat::{calc_sat_overlap, SatRect},
 };
 
 #[derive(Debug, Clone)]
 pub struct Trace {
     // The tile that was hit. 0 if no hit.
-    pub tile: i32,
+    pub is_collide: bool,
 
     // The tile position (in tile space) of the hit
     pub tile_pos: IVec2,
@@ -28,7 +27,7 @@ pub struct Trace {
 impl Default for Trace {
     fn default() -> Self {
         Trace {
-            tile: 0,
+            is_collide: false,
             pos: Vec2::ZERO,
             normal: Vec2::ZERO,
             length: 1.,
@@ -81,16 +80,9 @@ pub(crate) fn trace(
     let step_size = vel / steps;
 
     let mut last_tile_pos = IVec2::splat(-16);
-    let mut extra_step_for_slope = false;
 
     // used to perform sat collision
-    let sat_rect = SatRect {
-        angle,
-        pos: from_center,
-        half_size,
-    };
     let tile_hf_size = Vec2::splat(map.tile_size * 0.5);
-    let is_right_angle = is_right_angle(angle);
     for i in 0..=(steps as usize) {
         let tile_pos: IVec2 = {
             let tile_px = corner + step_size * i as f32;
@@ -114,22 +106,27 @@ pub(crate) fn trace(
                 .ceil() as i32;
             for t in 0..num_tiles {
                 let tile_pos = IVec2::new(tile_pos.x, tile_pos.y + dir.y as i32 * t);
-                if !is_right_angle {
+                // check tile collision with sat
+                let tile_shape = {
                     let pos = Vec2::new(
                         (tile_pos.x as f32) * map.tile_size + tile_hf_size.x,
                         (tile_pos.y as f32) * map.tile_size + tile_hf_size.y,
                     );
-                    // check tile collision with sat
-                    let tile_rect = SatRect {
+
+                    Shape {
                         angle: 0.0,
                         half_size: tile_hf_size,
                         pos,
-                    };
-                    if calc_sat_overlap(&sat_rect, &tile_rect).is_none() {
-                        continue;
                     }
+                };
+                let shape = Shape {
+                    pos: from_center,
+                    angle,
+                    half_size,
+                };
+                if let Some(overlap) = calc_overlap(&tile_shape, &shape) {
+                    check_tile(map, from, vel, tile_pos, overlap, &mut res);
                 }
-                check_tile(map, from, vel, size, tile_pos, &mut res);
             }
 
             last_tile_pos.x = tile_pos.x;
@@ -151,36 +148,35 @@ pub(crate) fn trace(
                 .ceil() as i32;
             for t in corner_tile_checked..num_tiles {
                 let tile_pos = IVec2::new(tile_pos.x + dir.x as i32 * t, tile_pos.y);
-                if !is_right_angle {
+                // check tile collision with sat
+                let tile_shape = {
                     let pos = Vec2::new(
                         (tile_pos.x as f32) * map.tile_size + tile_hf_size.x,
                         (tile_pos.y as f32) * map.tile_size + tile_hf_size.y,
                     );
-                    // check tile collision with sat
-                    let tile_rect = SatRect {
+
+                    Shape {
                         angle: 0.0,
                         half_size: tile_hf_size,
                         pos,
-                    };
-                    if calc_sat_overlap(&sat_rect, &tile_rect).is_none() {
-                        continue;
                     }
+                };
+                let shape = Shape {
+                    pos: from_center,
+                    angle,
+                    half_size,
+                };
+                if let Some(overlap) = calc_overlap(&tile_shape, &shape) {
+                    check_tile(map, from, vel, tile_pos, overlap, &mut res);
                 }
-                check_tile(map, from, vel, size, tile_pos, &mut res);
             }
 
             last_tile_pos.y = tile_pos.y;
         }
 
-        // If we collided with a sloped tile, we have to check one more step
-        // forward because we may still collide with another tile at an
-        // earlier .length point. For fully solid tiles (id: 1), we can
-        // return here.
-        if res.tile > 0 && (res.tile == 1 || extra_step_for_slope) {
-            res.pos += half_size;
-            return res;
+        if res.is_collide {
+            break;
         }
-        extra_step_for_slope = true;
     }
 
     res.pos += half_size;
@@ -191,65 +187,30 @@ fn check_tile(
     map: &CollisionMap,
     pos: Vec2,
     vel: Vec2,
-    size: Vec2,
     tile_pos: IVec2,
+    overlap: Vec2,
     res: &mut Trace,
 ) {
     if map.is_collide(tile_pos) {
-        resolve_full_tile(map, pos, vel, size, tile_pos, res);
+        resolve_full_tile(pos, vel, tile_pos, overlap, res);
     }
 }
 
-fn resolve_full_tile(
-    map: &CollisionMap,
-    pos: Vec2,
-    vel: Vec2,
-    size: Vec2,
-    tile_pos: IVec2,
-    res: &mut Trace,
-) {
+fn resolve_full_tile(pos: Vec2, vel: Vec2, tile_pos: IVec2, overlap: Vec2, res: &mut Trace) {
     // Resolved position, the minimum resulting x or y position in case of a collision.
     // Only the x or y coordinate is correct - depending on if we enter the tile
     // horizontaly or vertically. We will recalculate the wrong one again.
 
-    let mut rp: Vec2 = Vec2::new(
-        tile_pos.x as f32 * map.tile_size,
-        tile_pos.y as f32 * map.tile_size,
-    ) + Vec2::new(
-        if vel.x > 0. { -size.x } else { map.tile_size },
-        if vel.y > 0. { -size.y } else { map.tile_size },
-    );
+    let rp: Vec2 = pos + overlap;
+    res.normal = overlap.normalize_or_zero();
 
-    // The steps from pos to rp
-    let length;
-
-    // If we don't move in Y direction, or we do move in X and the tile
-    // corners's cross product with the movement vector has the correct sign,
-    // this is a horizontal collision, otherwise it's vertical.
-    // float sign = vec2_cross(vel, vec2_sub(rp, pos)) * vel.x * vel.y;
-    let sign = (vel.x * (rp.y - pos.y) - vel.y * (rp.x - pos.x)) * vel.x * vel.y;
-
-    if sign < 0. || vel.y == 0. {
-        // Horizontal collison (x direction, left or right edge)
-        length = ((pos.x - rp.x) / vel.x).abs();
-        if length > res.length {
-            return;
-        };
-
-        rp.y = pos.y + length * vel.y;
-        res.normal = Vec2::new(if vel.x > 0.0 { -1.0 } else { 1.0 }, 0.0);
+    let length = if overlap.x.abs() > overlap.y.abs() {
+        (overlap.x / vel.x).abs()
     } else {
-        // Vertical collision (y direction, top or bottom edge)
-        length = ((pos.y - rp.y) / vel.y).abs();
-        if length > res.length {
-            return;
-        };
+        (overlap.y / vel.y).abs()
+    };
 
-        rp.x = pos.x + length * vel.x;
-        res.normal = Vec2::new(0.0, if vel.y > 0.0 { -1.0 } else { 1.0 });
-    }
-
-    res.tile = 1;
+    res.is_collide = true;
     res.tile_pos = tile_pos;
     res.length = length;
     res.pos = rp;
