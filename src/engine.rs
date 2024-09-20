@@ -10,7 +10,7 @@ use glam::{UVec2, Vec2};
 use crate::{
     asset::{AssetManager, FetchedTask},
     camera::Camera,
-    collision::{calc_overlap, entity_move, resolve_collision},
+    collision::{calc_ent_overlap, entity_move, resolve_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
     commands::{Command, Commands},
     entity::{Ent, EntCollidesMode, EntPhysics, EntRef, EntType, EntTypeId},
@@ -425,7 +425,7 @@ impl Engine {
                         break;
                     }
                     self.perf.checks += 1;
-                    if let Some(overlap) = calc_overlap(w, ent1, ent2) {
+                    if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
                         let res = {
                             let [ent1, ent2] = w.many([ent1, ent2]);
 
