@@ -136,9 +136,12 @@ impl Render {
         let flip_x = flip_x || image.flip_x;
         let flip_y = flip_y || image.flip_y;
 
+        // Fix texture bleeding by offset half pixel on source
+        // see https://github.com/jjyr/roast2d/issues/6 for details
+        // NOTICE the offset is 1 pixel instead of 0.5 pixel on some backends
         let src = Rect {
-            min: src_pos,
-            max: src_pos + src_size,
+            min: src_pos + Vec2::splat(0.5),
+            max: src_pos + src_size - Vec2::splat(0.5),
         };
         let dst = Rect {
             min: dst_pos - half_dst_size,
