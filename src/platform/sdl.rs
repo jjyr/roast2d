@@ -55,18 +55,6 @@ impl ScreenBuffer {
     }
 }
 
-impl From<Rect> for sdl2::rect::Rect {
-    fn from(value: Rect) -> Self {
-        let size = value.max - value.min;
-        sdl2::rect::Rect::new(
-            value.min.x.floor() as i32,
-            value.min.y.floor() as i32,
-            size.x.ceil() as u32,
-            size.y.ceil() as u32,
-        )
-    }
-}
-
 pub struct SDLPlatform {
     screen_buffer: ScreenBuffer,
     textures: HashMap<u64, Texture>,
@@ -114,8 +102,25 @@ impl Platform for SDLPlatform {
         };
 
         let angle = angle.unwrap_or_default().to_degrees();
-        let src: Option<sdl2::rect::Rect> = src.map(Into::into);
-        let dst: sdl2::rect::Rect = dst.into();
+        let src = src.map(|Rect { min, max }| {
+            let size = max - min;
+            sdl2::rect::Rect::new(
+                min.x.ceil() as i32,
+                min.y.ceil() as i32,
+                size.x.floor() as u32,
+                size.y.floor() as u32,
+            )
+        });
+        let dst = {
+            let Rect { min, max } = dst;
+            let size = max - min;
+            sdl2::rect::Rect::new(
+                min.x.round() as i32,
+                min.y.round() as i32,
+                size.x.round() as u32,
+                size.y.round() as u32,
+            )
+        };
         texture.set_color_mod(color.r, color.g, color.b);
 
         self.screen_buffer
