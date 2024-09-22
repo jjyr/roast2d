@@ -6,9 +6,10 @@ I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d
 
 ## Features
 
-- Simple entity object with trait extention instead of ECS or hierarchy model
-- Built-in integration with [LDTK][LDTK] level editor
-- Multi-platform support (via SDL2 and WebAssembly)
+- Non ECS, just built-in entity with trait extension
+- Simple physics and collision detection
+- [LDTK][LDTK] level editor integration
+- Multi-platform (via SDL2 and WebAssembly)
 
 
 ## Examples
