@@ -41,11 +41,11 @@ impl Font {
             let min_x = glyphs
                 .first()
                 .map(|g| g.pixel_bounding_box().unwrap().min.x)
-                .unwrap();
+                .unwrap_or_default();
             let max_x = glyphs
                 .last()
                 .map(|g| g.pixel_bounding_box().unwrap().max.x)
-                .unwrap();
+                .unwrap_or_default();
             (max_x - min_x) as u32
         };
         let mut image = DynamicImage::new_rgba8(glyphs_width + 40, glyphs_height + 40).to_rgba8();
