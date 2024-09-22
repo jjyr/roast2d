@@ -203,6 +203,12 @@ impl Engine {
     }
 
     /// Create text
+    pub fn create_text(&mut self, text: Text) -> Sprite {
+        let (handle, size) = self.create_text_texture(text);
+        Sprite::new(handle, size)
+    }
+
+    /// Create text texture
     pub fn create_text_texture(&mut self, text: Text) -> (Handle, UVec2) {
         let handle = self.assets.alloc_handle();
         let size = self
