@@ -72,16 +72,17 @@ pub(crate) fn resolve_collision(
         b_move = a.mass / total_mass;
     }
 
-    if overlap_x > 0.0 {
-        entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x.abs());
-        eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
-        eng.collide(b.ent_ref, Vec2::new(1.0, 0.0), None);
-    } else if overlap_x < 0.0 {
-        entities_separate_on_x_axis(eng, b, a, b_move, a_move, overlap_x.abs());
-        eng.collide(a.ent_ref, Vec2::new(1.0, 0.0), None);
-        eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
-    }
-    if overlap_y > 0.0 {
+    if overlap_y.abs() > overlap_x.abs() {
+        if overlap_x > 0.0 {
+            entities_separate_on_x_axis(eng, a, b, a_move, b_move, overlap_x.abs());
+            eng.collide(a.ent_ref, Vec2::new(-1.0, 0.0), None);
+            eng.collide(b.ent_ref, Vec2::new(1.0, 0.0), None);
+        } else if overlap_x < 0.0 {
+            entities_separate_on_x_axis(eng, b, a, b_move, a_move, overlap_x.abs());
+            eng.collide(a.ent_ref, Vec2::new(1.0, 0.0), None);
+            eng.collide(b.ent_ref, Vec2::new(-1.0, 0.0), None);
+        }
+    } else if overlap_y > 0.0 {
         entities_separate_on_y_axis(eng, a, b, a_move, b_move, overlap_y.abs(), eng.tick);
         eng.collide(a.ent_ref, Vec2::new(0.0, -1.0), None);
         eng.collide(b.ent_ref, Vec2::new(0.0, 1.0), None);
