@@ -1,4 +1,3 @@
-pub use crate::animation::Animation;
 pub use crate::app::*;
 pub use crate::collision_map::CollisionMap;
 pub use crate::color::*;

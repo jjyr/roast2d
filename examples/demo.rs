@@ -1,5 +1,5 @@
 extern crate roast_2d;
-use std::cell::{OnceCell, RefCell};
+use std::cell::RefCell;
 
 use roast_2d::prelude::*;
 
@@ -10,18 +10,9 @@ const FRICTION: f32 = 4.0;
 const WALL_THICK: f32 = 200.0;
 const BRICK_SIZE: Vec2 = Vec2::new(64., 32.);
 const BRICK_DYING: f32 = 0.3;
-const TEXTURE_PATH: &str = "demo.png";
 
 thread_local! {
     static G: RefCell<Game> = RefCell::new(Game::default());
-    static TEXTURE: OnceCell<Handle> = const { OnceCell::new() } ;
-}
-
-fn load_texture(eng: &mut Engine) -> Handle {
-    TEXTURE.with(|t| {
-        t.get_or_init(|| eng.assets.load_texture(TEXTURE_PATH))
-            .clone()
-    })
 }
 
 #[derive(Default)]
@@ -46,27 +37,35 @@ impl From<Action> for ActionId {
 #[derive(Clone)]
 pub struct Ball {
     size: Vec2,
-    anim: Animation,
+    color: Color,
 }
 
 impl EntType for Ball {
-    fn load(eng: &mut Engine, _w: &mut World) -> Self {
+    fn load(_eng: &mut Engine, _w: &mut World) -> Self {
         let size = Vec2::new(32., 32.0);
-        let mut sheet = Sprite::with_sizef(load_texture(eng), size);
-        sheet.color = Color::rgb(0xfb, 0xf2, 0x36);
-        let anim = Animation::new(sheet);
-        Ball { size, anim }
+        let color = Color::rgb(0xfb, 0xf2, 0x36);
+        Ball { size, color }
     }
 
     fn init(&mut self, _eng: &mut Engine, w: &mut World, ent: EntRef) {
         let ent = w.get_mut(ent).unwrap();
         ent.size = self.size;
-        ent.anim = Some(self.anim.clone());
         ent.group = EntGroup::PROJECTILE;
         ent.accel.y = -BALL_ACCEL * 2.0;
         ent.friction = Vec2::splat(0.1);
         ent.physics = EntPhysics::LITE;
         ent.restitution = 12.0;
+    }
+
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: EntRef, viewport: Vec2) {
+        let ent = w.get(ent).unwrap();
+        eng.draw_rect(
+            self.size,
+            ent.pos + viewport,
+            Some(self.color),
+            Some(ent.scale),
+            None,
+        );
     }
 
     fn collide(
@@ -179,28 +178,36 @@ pub struct Brick {
     hit: bool,
     dying: f32,
     dead_pos: Vec2,
-    anim: Animation,
+    color: Color,
 }
 
 impl EntType for Brick {
-    fn load(eng: &mut Engine, _w: &mut World) -> Self {
-        let mut sheet = Sprite::with_sizef(load_texture(eng), BRICK_SIZE);
-        sheet.color = Color::rgb(0x5b, 0x6e, 0xe1);
-        let anim = Animation::new(sheet);
+    fn load(_eng: &mut Engine, _w: &mut World) -> Self {
+        let color = Color::rgb(0x5b, 0x6e, 0xe1);
         Brick {
             hit: false,
             dying: 0.0,
             dead_pos: Vec2::default(),
-            anim,
+            color,
         }
     }
 
     fn init(&mut self, _eng: &mut Engine, w: &mut World, ent: EntRef) {
         let ent = w.get_mut(ent).unwrap();
-        ent.anim = Some(self.anim.clone());
         ent.size = BRICK_SIZE;
         ent.check_against = EntGroup::PROJECTILE;
         ent.physics = EntPhysics::ACTIVE;
+    }
+
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: EntRef, viewport: Vec2) {
+        let ent = w.get(ent).unwrap();
+        eng.draw_rect(
+            ent.size,
+            ent.pos + viewport,
+            Some(self.color),
+            Some(ent.scale),
+            None,
+        );
     }
 
     fn kill(&mut self, _eng: &mut Engine, _w: &mut World, _ent: EntRef) {
@@ -232,9 +239,7 @@ impl EntType for Brick {
             };
             let ent = w.get_mut(ent).unwrap();
             ent.scale = Vec2::splat(scale);
-            if let Some(anim) = ent.anim.as_mut() {
-                anim.sheet.color = color;
-            }
+            self.color = color;
         }
     }
 
@@ -249,26 +254,34 @@ impl EntType for Brick {
 #[derive(Clone)]
 pub struct Player {
     size: Vec2,
-    anim: Animation,
+    color: Color,
 }
 
 impl EntType for Player {
-    fn load(eng: &mut Engine, _w: &mut World) -> Self {
+    fn load(_eng: &mut Engine, _w: &mut World) -> Self {
         let size = Vec2::new(128.0, 48.0);
-        let mut sheet = Sprite::with_sizef(load_texture(eng), size);
-        sheet.color = Color::rgb(0x37, 0x94, 0x6e);
-        let anim = Animation::new(sheet);
+        let color = Color::rgb(0x37, 0x94, 0x6e);
 
-        Self { size, anim }
+        Self { size, color }
     }
 
     fn init(&mut self, _eng: &mut Engine, w: &mut World, ent: EntRef) {
         let ent = w.get_mut(ent).unwrap();
         ent.size = self.size;
-        ent.anim = Some(self.anim.clone());
         ent.friction = Vec2::splat(FRICTION);
         ent.check_against = EntGroup::PROJECTILE;
         ent.physics = EntPhysics::ACTIVE;
+    }
+
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: EntRef, viewport: Vec2) {
+        let ent = w.get(ent).unwrap();
+        eng.draw_rect(
+            ent.size,
+            ent.pos + viewport,
+            Some(self.color),
+            Some(ent.scale),
+            None,
+        );
     }
 
     fn update(&mut self, eng: &mut Engine, w: &mut World, ent: EntRef) {

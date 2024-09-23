@@ -5,8 +5,7 @@ use dyn_clone::DynClone;
 use glam::Vec2;
 
 use crate::{
-    animation::Animation, collision::calc_bounds, engine::Engine, trace::Trace, types::Rect,
-    world::World,
+    collision::calc_bounds, engine::Engine, sprite::Sprite, trace::Trace, types::Rect, world::World,
 };
 
 bitflags! {
@@ -118,7 +117,7 @@ pub struct Ent {
     pub restitution: f32,
     pub max_ground_normal: f32,
     pub min_slide_normal: f32,
-    pub anim: Option<Animation>,
+    pub sprite: Option<Sprite>,
     pub(crate) instance: Option<Box<dyn EntType>>,
 }
 
@@ -148,7 +147,7 @@ impl Ent {
             restitution: 0.0,
             max_ground_normal: 0.69, // cosf(to_radians(46))
             min_slide_normal: 1.0,   // cosf(to_radians(0))
-            anim: None,
+            sprite: None,
             instance,
             scale: Vec2::splat(1.0),
             angle: 0.0,
@@ -223,9 +222,9 @@ pub trait EntType: DynClone {
         let Some(ent) = w.get(ent) else {
             return;
         };
-        if let Some(anim) = ent.anim.as_ref() {
+        if let Some(sprite) = ent.sprite.as_ref() {
             eng.render.borrow_mut().draw_image(
-                &anim.sheet,
+                sprite,
                 (ent.pos - viewport) - ent.offset,
                 Some(ent.scale),
                 Some(ent.angle),

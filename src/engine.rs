@@ -2,6 +2,7 @@ use std::{
     any::{type_name, Any},
     cell::{RefCell, UnsafeCell},
     rc::Rc,
+    sync::OnceLock,
 };
 
 use anyhow::{bail, Result};
@@ -12,6 +13,7 @@ use crate::{
     camera::Camera,
     collision::{calc_ent_overlap, entity_move, resolve_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
+    color::Color,
     commands::{Command, Commands},
     entity::{Ent, EntCollidesMode, EntPhysics, EntRef, EntType, EntTypeId},
     font::Text,
@@ -27,7 +29,25 @@ use crate::{
     world::World,
 };
 
+/// Default texture
+static DEFAULT_TEXTURE: OnceLock<Handle> = OnceLock::new();
+/// Max tick
 const ENGINE_MAX_TICK: f32 = 100.0;
+
+/// get default texture
+fn default_texture(eng: &mut Engine) -> Handle {
+    DEFAULT_TEXTURE
+        .get_or_init(|| {
+            let handle = eng.assets.alloc_handle();
+            let data = vec![255, 255, 255, 255];
+            let size = UVec2::splat(1);
+            eng.with_platform(|p| {
+                p.create_texture(handle.clone(), data, size);
+            });
+            handle
+        })
+        .clone()
+}
 
 // Scene trait
 pub trait Scene {
@@ -154,7 +174,7 @@ impl Engine {
             Some(ent_ref) => ent_ref,
             None => {
                 panic!(
-                    "Can't get entity type, make sure {} is registered with add_entity_type",
+                    "Can't get entity type, make sure {} add_entity_type is called",
                     type_name::<T>()
                 )
             }
@@ -169,7 +189,7 @@ impl Engine {
         {
             Some(ent_ref) => ent_ref,
             None => {
-                panic!("Can't get entity type, make sure {name} is registered with add_entity_type")
+                panic!("Can't get entity type, make sure {name} add_entity_type is called")
             }
         }
     }
@@ -216,6 +236,25 @@ impl Engine {
             .borrow_mut()
             .create_text_texture(handle.clone(), text);
         (handle, size)
+    }
+
+    /// Draw rectangle
+    pub fn draw_rect(
+        &mut self,
+        size: Vec2,
+        pos: Vec2,
+        color: Option<Color>,
+        scale: Option<Vec2>,
+        angle: Option<f32>,
+    ) {
+        let texture = default_texture(self);
+        let mut image = Sprite::with_sizef(texture, size);
+        if let Some(color) = color {
+            image.color = color;
+        }
+        self.render
+            .borrow_mut()
+            .draw_image(&image, pos, scale, angle);
     }
 
     /// Draw image
@@ -691,6 +730,7 @@ impl Engine {
         entity_move(self, ent, vstep);
     }
 
+    /// Handle commands
     fn handle_commands(&mut self, w: &mut World) {
         let commands = self.commands.take();
         for command in commands {
