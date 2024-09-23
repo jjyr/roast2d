@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use roast_2d::prelude::*;
-use roast_2d::sat::*;
+use roast2d::prelude::*;
+use roast2d::sat::*;
 
 fn sat_collide(n: usize) {
     let rect1 = SatRect {
