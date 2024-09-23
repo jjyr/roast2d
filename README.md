@@ -1,5 +1,9 @@
 # Roast2D
 
+[![Crates.io](https://img.shields.io/crates/v/roast2d.svg)](https://crates.io/crates/roast2d)
+[![Docs](https://docs.rs/roast2d/badge.svg)](https://docs.rs/roast2d/latest/roast2d/)
+[![CI](https://github.com/jjyr/roast2d/workflows/CI/badge.svg)](https://github.com/jjyr/roast2d/actions)
+
 Roast2D is a rapid development 2D game engine written in Rust. Inspired by [high_impact][high_impact].
 
 I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d)
