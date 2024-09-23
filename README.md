@@ -25,10 +25,10 @@ Run example:
 cargo run --example demo
 ```
 
-Add `roast-2d` to Rust project:
+Add `roast2d` to Rust project:
  
 ``` bash
-cargo add roast-2d
+cargo add roast2d
 ```
 
 Roast2D supports multiple backends:

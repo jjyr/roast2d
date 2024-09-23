@@ -1,7 +1,7 @@
-extern crate roast_2d;
+extern crate roast2d;
 use std::cell::RefCell;
 
-use roast_2d::prelude::*;
+use roast2d::prelude::*;
 
 const BALL_ACCEL: f32 = 200.0;
 const BALL_MAX_VEL: f32 = 300.0;
