@@ -45,6 +45,7 @@ pub struct Camera {
     pos: Vec2,
     vel: Vec2,
     snap: bool,
+    force: bool,
 }
 
 impl Camera {
@@ -103,24 +104,34 @@ impl Camera {
             let deadzone_target = self.deadzone_pos + self.deadzone * 0.5;
             self.pos = deadzone_target + self.look_ahead_target;
         }
-        let diff = self.viewport_target(screen_size, bounds) - self.viewport;
-        self.vel = diff * self.speed;
 
-        if self.snap
-            || self.vel.x.abs() + self.vel.y.abs() > self.min_vel.x.abs() + self.min_vel.y.abs()
-        {
-            self.viewport += self.vel * tick;
+        if self.force {
+            // force set camera
+            self.viewport = self.viewport_target(screen_size, bounds);
             self.snap = false;
-        }
-    }
+            self.force = false;
+        } else {
+            // move camera
+            let diff = self.viewport_target(screen_size, bounds) - self.viewport;
+            self.vel = diff * self.speed;
 
-    pub fn set_pos(&mut self, pos: Vec2) {
-        self.pos = pos;
-        self.snap = true;
+            if self.snap
+                || self.vel.x.abs() + self.vel.y.abs() > self.min_vel.x.abs() + self.min_vel.y.abs()
+            {
+                self.viewport += self.vel * tick;
+                self.snap = false;
+            }
+        }
     }
 
     pub fn move_pos(&mut self, pos: Vec2) {
         self.pos = pos;
+        self.snap = true;
+    }
+
+    pub fn set_pos(&mut self, pos: Vec2) {
+        self.pos = pos;
+        self.force = true;
     }
 
     pub fn follow(&mut self, entity_ref: EntRef, snap: bool) {

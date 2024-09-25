@@ -361,24 +361,24 @@ impl Engine {
 
     /// Scene base draw, draw maps and entities
     pub fn scene_base_draw(&mut self, w: &mut World) {
+        let viewport = self.viewport();
         let mut render = self.render.borrow_mut();
-        let px_viewport = render.snap_px(self.camera.viewport);
 
         // Background maps
         for map in self.background_maps.iter().rev() {
             if !map.foreground {
-                map_draw(&mut render, map, px_viewport);
+                map_draw(&mut render, map, viewport);
             }
         }
         drop(render);
 
-        self.entities_draw(w, px_viewport);
+        self.entities_draw(w, viewport);
 
         // Foreground maps
         let mut render = self.render.borrow_mut();
         for map in self.background_maps.iter().rev() {
             if map.foreground {
-                map_draw(&mut render, map, px_viewport);
+                map_draw(&mut render, map, viewport);
             }
         }
     }
@@ -599,6 +599,11 @@ impl Engine {
             }
         }
         Ok(())
+    }
+
+    pub fn viewport(&self) -> Vec2 {
+        let render = self.render.borrow();
+        render.snap_px(self.camera.viewport)
     }
 
     /// Set a scene, the scene swap do not happend instantly, it is happend in engine update
