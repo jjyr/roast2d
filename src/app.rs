@@ -1,7 +1,7 @@
 use anyhow::Result;
 use glam::UVec2;
 
-use crate::{engine::Engine, platform::platform_run, world::World};
+use crate::{ecs::world::World, engine::Engine, platform::platform_run};
 
 #[derive(Debug)]
 pub struct App {

@@ -11,22 +11,31 @@ use glam::{UVec2, Vec2};
 use crate::{
     asset::{AssetManager, FetchedTask},
     camera::Camera,
-    collision::{calc_ent_overlap, entity_move, resolve_collision},
+    collision::{calc_ent_overlap, resolve_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
     color::Color,
     commands::{Command, Commands},
-    entity::{Ent, EntCollidesMode, EntPhysics, EntRef, EntType, EntTypeId},
+    ecs::{
+        component::{Component, ComponentId},
+        entity::Ent,
+        entity_ref::EntMut,
+        world::World,
+    },
     font::Text,
     handle::Handle,
+    health::Health,
+    hooks::{get_ent_hooks, Hooks},
     input::InputState,
     ldtk::{LayerType, LdtkProject},
     map::{map_draw, Map},
+    physics::{self, entity_move},
+    physics::{EntCollidesMode, EntPhysics},
     platform::Platform,
     render::{Render, ResizeMode, ScaleMode},
     sprite::Sprite,
     trace::Trace,
+    transform::Transform,
     types::SweepAxis,
-    world::World,
 };
 
 /// Default texture
@@ -157,64 +166,6 @@ impl Engine {
             sweep_axis: SweepAxis::default(),
             assets: AssetManager::new("assets"),
         }
-    }
-
-    /// Registry a new entity type
-    /// this function must be called before add entity
-    pub fn add_ent_type<T: EntType + Clone + 'static>(&mut self, w: &mut World) {
-        let ent_type: Rc<dyn EntType> = Rc::new(T::load(self, w));
-        w.add_ent_type::<T>(ent_type);
-    }
-
-    /// Spawn a new entity
-    pub fn spawn<T: EntType + 'static>(&mut self, w: &mut World, pos: Vec2) -> EntRef {
-        // fetch id
-        let ent_type = EntTypeId::of::<T>();
-        match self.spawn_with_type_id(w, ent_type, pos) {
-            Some(ent_ref) => ent_ref,
-            None => {
-                panic!(
-                    "Can't get entity type, make sure {} add_entity_type is called",
-                    type_name::<T>()
-                )
-            }
-        }
-    }
-
-    pub fn spawn_with_type_name(&mut self, w: &mut World, name: String, pos: Vec2) -> EntRef {
-        match w
-            .get_type_id_by_name(&name)
-            .cloned()
-            .and_then(|ent_type_id| self.spawn_with_type_id(w, ent_type_id, pos))
-        {
-            Some(ent_ref) => ent_ref,
-            None => {
-                panic!("Can't get entity type, make sure {name} add_entity_type is called")
-            }
-        }
-    }
-
-    fn spawn_with_type_id(
-        &mut self,
-        w: &mut World,
-        ent_type: EntTypeId,
-        pos: Vec2,
-    ) -> Option<EntRef> {
-        let ent_ref = {
-            let instance = w.get_ent_type_instance(&ent_type)?;
-            let id = w.next_unique_id();
-
-            // add to world
-            let ent = Ent::new(id, ent_type, instance, pos);
-            w.spawn(ent)
-        };
-
-        // init
-        w.with_ent(ent_ref, |w, ent_ref, instance: &mut dyn EntType| {
-            instance.init(self, w, ent_ref);
-        });
-
-        Some(ent_ref)
     }
 
     pub(crate) fn with_platform<R, F: FnOnce(&mut dyn Platform) -> R>(&mut self, f: F) -> R {
@@ -388,125 +339,107 @@ impl Engine {
         self.entities_update(w);
     }
 
-    /// Entity base update, handle physics velocities
-    pub(crate) fn entity_base_update(&mut self, w: &mut World, ent: EntRef) {
-        let Some(ent) = w.get_mut(ent) else {
-            return;
-        };
-        if !ent.physics.contains(EntPhysics::MOVE) {
-            return;
-        }
-        // Integrate velocity
-        let vel = ent.vel;
-        ent.vel.y += self.gravity * ent.gravity * self.tick;
-        let fric = Vec2::new(
-            (ent.friction.x * self.tick).min(1.0),
-            (ent.friction.y * self.tick).min(1.0),
-        );
-        ent.vel = ent.vel + (ent.accel * self.tick - ent.vel * fric);
-        let vstep = (vel + ent.vel) * (self.tick * 0.5);
-        ent.on_ground = false;
-        entity_move(self, ent, vstep);
-    }
-
     fn entities_draw(&mut self, w: &mut World, viewport: Vec2) {
         // Sort entities by draw_order
-        let mut ents: Vec<_> = w.entities().map(|ent| ent.ent_ref).collect();
-        ents.sort_by_key(|ent_ref| w.get(*ent_ref).unwrap().draw_order);
-        for ent_ref in ents {
-            w.with_ent(ent_ref, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
-                instance.draw(self, w, ent_ref, viewport);
-            });
+        let mut ents: Vec<_> = w
+            .iter_ent_refs()
+            .filter_map(|ent_ref| {
+                let transform = ent_ref.get::<Transform>()?;
+                Some((ent_ref.id(), transform.z_index))
+            })
+            .collect();
+        ents.sort_by_key(|(_ent, z)| *z);
+        for (ent, _z) in ents {
+            if let Some(hooks) = get_ent_hooks(w, ent) {
+                hooks.draw(self, w, ent, viewport);
+            }
         }
     }
 
     fn entities_update(&mut self, w: &mut World) {
         // Update all entities
-        let mut i = 0;
-        while i < w.alloced() {
-            let ent_ref = w.get_nth(i).cloned().unwrap();
-            w.with_ent(ent_ref, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
-                instance.update(self, w, ent_ref);
-            });
-            self.entity_base_update(w, ent_ref);
-            w.with_ent(ent_ref, |w, ent_ref, instance: &mut dyn EntType| {
-                instance.post_update(self, w, ent_ref);
-            });
-            if w.get_unchecked(ent_ref).is_some_and(|ent| !ent.alive) {
-                // remove if not alive
-                w.swap_remove(i);
+        let ents: Vec<_> = w.iter_ents().cloned().collect();
+        let ents_count = ents.len();
+        for ent in ents {
+            let ent_hooks = get_ent_hooks(w, ent);
+            if let Some(hooks) = ent_hooks.as_ref() {
+                hooks.update(self, w, ent);
             }
-
-            i += 1;
-        }
-
-        // Sort by x or y position
-        // insertion sort can gain better performance since list is sorted in every frames
-        let sweep_axis = self.sweep_axis;
-        w.sort_entities_for_sweep(sweep_axis);
-
-        // Sweep touches
-        self.perf.checks = 0;
-        let entities_count = w.alloced();
-        for i in 0..entities_count {
-            let ent1 = w.get_nth(i).cloned().unwrap();
-            let (res, ent1_bounds) = {
-                let ent1 = w.get(ent1).unwrap();
-                let res = !ent1.check_against.is_empty()
-                    || !ent1.group.is_empty()
-                    || ent1.physics.is_at_least(EntPhysics::PASSIVE);
-
-                (res, ent1.bounds())
-            };
-            if res {
-                let max_pos = sweep_axis.get(ent1_bounds.max);
-                for j in (i + 1)..entities_count {
-                    let (ent2, ent2_bounds) = {
-                        let ent2 = w.get_nth(j).cloned().unwrap();
-                        let ent2_bounds = w.get(ent2).unwrap().bounds();
-                        (ent2, ent2_bounds)
-                    };
-                    if sweep_axis.get(ent2_bounds.min) > max_pos {
-                        break;
-                    }
-                    self.perf.checks += 1;
-                    if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
-                        let res = {
-                            let [ent1, ent2] = w.many([ent1, ent2]);
-
-                            !(ent1.check_against & ent2.group).is_empty()
-                        };
-                        if res {
-                            w.with_ent(ent1, |w, ent1: EntRef, instance: &mut dyn EntType| {
-                                instance.touch(self, w, ent1, ent2);
-                            });
-                        }
-                        let res = {
-                            let [ent1, ent2] = w.many([ent1, ent2]);
-                            !(ent1.group & ent2.check_against).is_empty()
-                        };
-                        if res {
-                            w.with_ent(ent2, |w, ent2: EntRef, instance: &mut dyn EntType| {
-                                instance.touch(self, w, ent2, ent1);
-                            });
-                        }
-
-                        let res = {
-                            let [ent1, ent2] = w.many([ent1, ent2]);
-                            ent1.physics.bits() >= EntCollidesMode::LITE.bits()
-                                && ent2.physics.bits() >= EntCollidesMode::LITE.bits()
-                                && ent1.physics.bits().saturating_add(ent2.physics.bits())
-                                    >= (EntCollidesMode::ACTIVE | EntCollidesMode::LITE).bits()
-                                && (ent1.mass + ent2.mass) > 0.0
-                        };
-                        if res {
-                            resolve_collision(self, w, ent1, ent2, overlap);
-                        }
-                    }
-                }
+            // physics update
+            physics::entity_base_update(self, w, ent);
+            if let Some(hooks) = ent_hooks {
+                hooks.post_update(self, w, ent);
             }
         }
-        self.perf.entities = w.alloced();
+
+        // TODO
+        // // Sort by x or y position
+        // // insertion sort can gain better performance since list is sorted in every frames
+        // let sweep_axis = self.sweep_axis;
+        // w.sort_entities_for_sweep(sweep_axis);
+
+        // // Sweep touches
+        // self.perf.checks = 0;
+        // let entities_count = w.alloced();
+        // for i in 0..entities_count {
+        //     let ent1 = w.get_nth_ent(i).cloned().unwrap();
+        //     let (res, ent1_bounds) = {
+        //         let ent1 = w.get(ent1).unwrap();
+        //         let res = !ent1.check_against.is_empty()
+        //             || !ent1.group.is_empty()
+        //             || ent1.physics.is_at_least(EntPhysics::PASSIVE);
+
+        //         (res, ent1.bounds())
+        //     };
+        //     if res {
+        //         let max_pos = sweep_axis.get(ent1_bounds.max);
+        //         for j in (i + 1)..entities_count {
+        //             let (ent2, ent2_bounds) = {
+        //                 let ent2 = w.get_nth_ent(j).cloned().unwrap();
+        //                 let ent2_bounds = w.get(ent2).unwrap().bounds();
+        //                 (ent2, ent2_bounds)
+        //             };
+        //             if sweep_axis.get(ent2_bounds.min) > max_pos {
+        //                 break;
+        //             }
+        //             self.perf.checks += 1;
+        //             if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
+        //                 let res = {
+        //                     let [ent1, ent2] = w.many([ent1, ent2]);
+
+        //                     !(ent1.check_against & ent2.group).is_empty()
+        //                 };
+        //                 if res {
+        //                     w.with_ent(ent1, |w, ent1: Ent, instance: &mut dyn Component| {
+        //                         instance.touch(self, w, ent1, ent2);
+        //                     });
+        //                 }
+        //                 let res = {
+        //                     let [ent1, ent2] = w.many([ent1, ent2]);
+        //                     !(ent1.group & ent2.check_against).is_empty()
+        //                 };
+        //                 if res {
+        //                     w.with_ent(ent2, |w, ent2: Ent, instance: &mut dyn Component| {
+        //                         instance.touch(self, w, ent2, ent1);
+        //                     });
+        //                 }
+
+        //                 let res = {
+        //                     let [ent1, ent2] = w.many([ent1, ent2]);
+        //                     ent1.physics.bits() >= EntCollidesMode::LITE.bits()
+        //                         && ent2.physics.bits() >= EntCollidesMode::LITE.bits()
+        //                         && ent1.physics.bits().saturating_add(ent2.physics.bits())
+        //                             >= (EntCollidesMode::ACTIVE | EntCollidesMode::LITE).bits()
+        //                         && (ent1.mass + ent2.mass) > 0.0
+        //                 };
+        //                 if res {
+        //                     resolve_collision(self, w, ent1, ent2, overlap);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        self.perf.entities = ents_count;
     }
 
     /// Called per frame, the main update logic of engine
@@ -645,28 +578,29 @@ impl Engine {
                     self.background_maps.push(map);
                 }
                 LayerType::Entities => {
-                    for ent_ins in &layer.entity_instances {
-                        let pos = Vec2::new(
-                            (ent_ins.px.0 + ent_ins.width / 2) as f32,
-                            (ent_ins.px.1 + ent_ins.height / 2) as f32,
-                        );
-                        let ent_ref = {
-                            let ent_ref =
-                                self.spawn_with_type_name(w, ent_ins.identifier.clone(), pos);
-                            if let Some(ent) = w.get_mut(ent_ref) {
-                                ent.size.x = ent_ins.width as f32;
-                                ent.size.y = ent_ins.height as f32;
-                            }
-                            ent_ref
-                        };
-                        let settings = ent_ins
-                            .field_instances
-                            .iter()
-                            .map(|f| (f.identifier.clone(), f.value.clone()))
-                            .collect();
+                    // TODO spawn entities
+                    // for ent_ins in &layer.entity_instances {
+                    //     let pos = Vec2::new(
+                    //         (ent_ins.px.0 + ent_ins.width / 2) as f32,
+                    //         (ent_ins.px.1 + ent_ins.height / 2) as f32,
+                    //     );
+                    //     let ent_ref = {
+                    //         let ent_ref =
+                    //             self.spawn_with_type_name(w, ent_ins.identifier.clone(), pos);
+                    //         if let Some(ent) = w.get_mut(ent_ref) {
+                    //             ent.size.x = ent_ins.width as f32;
+                    //             ent.size.y = ent_ins.height as f32;
+                    //         }
+                    //         ent_ref
+                    //     };
+                    //     let settings = ent_ins
+                    //         .field_instances
+                    //         .iter()
+                    //         .map(|f| (f.identifier.clone(), f.value.clone()))
+                    //         .collect();
 
-                        self.setting(ent_ref, settings);
-                    }
+                    //     self.setting(ent_ref, settings);
+                    // }
                 }
                 _ => {
                     log::error!("Ignore layer {} {:?}", layer.identifier, layer.r#type);
@@ -697,22 +631,22 @@ impl Engine {
         // Do nothing
     }
 
-    pub(crate) fn collide(&mut self, ent: EntRef, normal: Vec2, trace: Option<Trace>) {
+    pub(crate) fn collide(&mut self, ent: Ent, normal: Vec2, trace: Option<Trace>) {
         self.commands.add(Command::Collide { ent, normal, trace });
     }
 
     /// Setting an entity
-    pub fn setting(&mut self, ent: EntRef, settings: serde_json::Value) {
+    pub fn setting(&mut self, ent: Ent, settings: serde_json::Value) {
         self.commands.add(Command::Setting { ent, settings });
     }
 
     /// Kill an entity
-    pub fn kill(&mut self, ent: EntRef) {
+    pub fn kill(&mut self, ent: Ent) {
         self.commands.add(Command::KillEnt { ent });
     }
 
     /// Damage an entity
-    pub fn damage(&mut self, ent: EntRef, by_ent: EntRef, damage: f32) {
+    pub fn damage(&mut self, ent: Ent, by_ent: Ent, damage: f32) {
         self.commands.add(Command::Damage {
             ent,
             by_ent,
@@ -721,17 +655,17 @@ impl Engine {
     }
 
     /// Trigger an entity
-    pub fn trigger(&mut self, ent: EntRef, other: EntRef) {
+    pub fn trigger(&mut self, ent: Ent, other: Ent) {
         self.commands.add(Command::Trigger { ent, other });
     }
 
     /// Message an entity
-    pub fn message(&mut self, ent: EntRef, data: Box<dyn Any>) {
+    pub fn message(&mut self, ent: Ent, data: Box<dyn Any>) {
         self.commands.add(Command::Message { ent, data });
     }
 
     /// Move entity
-    pub fn move_ent(&mut self, ent: &mut Ent, vstep: Vec2) {
+    pub fn move_ent(&mut self, ent: &mut EntMut, vstep: Vec2) {
         entity_move(self, ent, vstep);
     }
 
@@ -741,41 +675,44 @@ impl Engine {
         for command in commands {
             match command {
                 Command::Collide { ent, normal, trace } => {
-                    w.with_ent(ent, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
-                        instance.collide(self, w, ent_ref, normal, trace.as_ref());
-                    });
+                    if let Some(hooks) = get_ent_hooks(w, ent) {
+                        hooks.collide(self, w, ent, normal, trace.as_ref());
+                    }
                 }
                 Command::Setting { ent, settings } => {
-                    w.with_ent(ent, |w, ent_ref: EntRef, instance: &mut dyn EntType| {
-                        instance.settings(self, w, ent_ref, settings);
-                    });
+                    if let Some(hooks) = get_ent_hooks(w, ent) {
+                        hooks.settings(self, w, ent, settings);
+                    }
                 }
                 Command::KillEnt { ent } => {
-                    w.with_ent(ent, |w, ent, instance| {
-                        if let Some(ent) = w.get_mut(ent) {
-                            ent.alive = false;
+                    if let Some(mut ent) = w.get_mut(ent) {
+                        if let Some(health) = ent.get_mut::<Health>() {
+                            health.alive = false;
                         }
-                        instance.kill(self, w, ent);
-                    });
+                    }
+                    if let Some(hooks) = get_ent_hooks(w, ent) {
+                        hooks.kill(self, w, ent);
+                    }
+                    w.despawn(ent);
                 }
                 Command::Damage {
                     ent,
                     by_ent,
                     damage,
                 } => {
-                    w.with_ent(ent, |w, ent, instance| {
-                        instance.damage(self, w, ent, by_ent, damage);
-                    });
+                    if let Some(hooks) = get_ent_hooks(w, ent) {
+                        hooks.damage(self, w, ent, by_ent, damage);
+                    }
                 }
                 Command::Trigger { ent, other } => {
-                    w.with_ent(ent, |w, ent, instance| {
-                        instance.trigger(self, w, ent, other);
-                    });
+                    if let Some(hooks) = get_ent_hooks(w, ent) {
+                        hooks.trigger(self, w, ent, other);
+                    }
                 }
                 Command::Message { ent, data } => {
-                    w.with_ent(ent, |w, ent, instance| {
-                        instance.message(self, w, ent, data);
-                    });
+                    if let Some(hooks) = get_ent_hooks(w, ent) {
+                        hooks.message(self, w, ent, data);
+                    }
                 }
             }
         }

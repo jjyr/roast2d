@@ -3,10 +3,10 @@ use glam::UVec2;
 
 use crate::{
     color::Color,
+    ecs::world::World,
     engine::Engine,
     handle::{Handle, HandleId},
     types::Rect,
-    world::World,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
