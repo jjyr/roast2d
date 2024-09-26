@@ -1,0 +1,1 @@
+pub trait Resource {}
