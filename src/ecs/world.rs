@@ -10,6 +10,7 @@ use crate::{ecs::entity::Ent, sorts::insertion_sort_by_key, types::SweepAxis};
 use super::{
     component::{Component, ComponentId},
     entity_ref::{EntMut, EntRef},
+    resource::Resource,
     unsafe_world_ref::UnsafeWorldRef,
 };
 
@@ -24,6 +25,7 @@ pub struct World {
     pub(crate) storage: HashMap<ComponentId, HashMap<Ent, Box<dyn Component>>>,
     /// Name to Entity Types
     components_names: HashMap<String, ComponentId>,
+    resources: HashMap<ComponentId, Box<dyn Resource>>,
 }
 
 impl World {
@@ -40,12 +42,34 @@ impl World {
         self.components_names.get(name)
     }
 
-    fn to_unsafe_world_ref<'w>(&'w self) -> UnsafeWorldRef<'w> {
+    fn to_unsafe_world_ref(&self) -> UnsafeWorldRef {
         UnsafeWorldRef::new_readonly(self)
     }
 
-    fn to_unsafe_world_mut<'w>(&'w mut self) -> UnsafeWorldRef<'w> {
+    fn to_unsafe_world_mut(&mut self) -> UnsafeWorldRef {
         UnsafeWorldRef::new_mutable(self)
+    }
+
+    /// Add Resource
+    pub fn add_resource<T: Resource + 'static>(&mut self, resource: T) {
+        let id = ComponentId::of::<T>();
+        self.resources.insert(id, Box::new(resource));
+    }
+
+    /// Get Resource
+    pub fn get_resource<T: Resource + 'static>(&self) -> Option<&T> {
+        let id = ComponentId::of::<T>();
+        self.resources
+            .get(&id)
+            .map(|r| unsafe { &*<*const _>::cast(r) })
+    }
+
+    /// Get Resource mut
+    pub fn get_resource_mut<T: Resource + 'static>(&mut self) -> Option<&mut T> {
+        let id = ComponentId::of::<T>();
+        self.resources
+            .get_mut(&id)
+            .map(|r| unsafe { &mut *<*mut _>::cast(r) })
     }
 
     /// Get an entity ref
@@ -72,10 +96,7 @@ impl World {
     }
 
     /// Get many entity mut
-    pub fn get_many_mut<'w, const N: usize>(
-        &'w mut self,
-        ents: [Ent; N],
-    ) -> [Option<EntMut<'w>>; N] {
+    pub fn get_many_mut<const N: usize>(&mut self, ents: [Ent; N]) -> [Option<EntMut>; N] {
         ents.map(|ent| {
             if self.entities.contains(&ent) {
                 let world_ref = UnsafeWorldRef::new_readonly(self);
@@ -92,7 +113,7 @@ impl World {
     }
 
     /// Get many entity mut
-    pub fn many_mut<'w, const N: usize>(&'w mut self, ents: [Ent; N]) -> [EntMut<'w>; N] {
+    pub fn many_mut<const N: usize>(&mut self, ents: [Ent; N]) -> [EntMut; N] {
         ents.map(|ent| {
             if self.entities.contains(&ent) {
                 let world_ref = UnsafeWorldRef::new_readonly(self);

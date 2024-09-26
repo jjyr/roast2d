@@ -3,6 +3,7 @@ pub use crate::collision_map::CollisionMap;
 pub use crate::color::*;
 pub use crate::ecs::component::{Component, ComponentId};
 pub use crate::ecs::entity::Ent;
+pub use crate::ecs::resource::Resource;
 pub use crate::ecs::world::World;
 pub use crate::engine::{Engine, Scene};
 pub use crate::entity_hooks::EntHooks;
