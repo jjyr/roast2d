@@ -5,8 +5,18 @@ use glam::{UVec2, Vec2};
 
 use crate::{
     color::{Color, WHITE},
+    ecs::component::Component,
     handle::Handle,
 };
+
+impl Debug for Sprite {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let size = self.size();
+        f.debug_struct("Sprite").field("size", &size).finish()
+    }
+}
+
+impl Component for Sprite {}
 
 /// Sprite
 #[derive(Clone)]
@@ -46,16 +56,7 @@ impl Sprite {
         let size = UVec2::new(size.x as u32, size.y as u32);
         Self::new(texture, size)
     }
-}
 
-impl Debug for Sprite {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let size = self.size();
-        f.debug_struct("Image").field("size", &size).finish()
-    }
-}
-
-impl Sprite {
     /// Return image size
     pub fn size(&self) -> UVec2 {
         self.size

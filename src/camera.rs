@@ -1,7 +1,9 @@
 use glam::Vec2;
 
 use crate::{
-    entity::{Ent, EntRef},
+    ecs::{entity::Ent, entity_ref::EntRef},
+    physics::Physics,
+    transform::Transform,
     types::Rect,
 };
 
@@ -41,7 +43,7 @@ pub struct Camera {
     // Internal state
     deadzone_pos: Vec2,
     look_ahead_target: Vec2,
-    pub(crate) follow: Option<EntRef>,
+    pub(crate) follow: Option<Ent>,
     pos: Vec2,
     vel: Vec2,
     snap: bool,
@@ -67,19 +69,23 @@ impl Camera {
         &mut self,
         tick: f32,
         screen_size: Vec2,
-        follow: Option<&Ent>,
+        follow: Option<EntRef>,
         bounds: Option<Vec2>,
     ) {
         if let Some(follow) = follow {
-            let follow_size = follow.scaled_size();
+            let Some(transform) = follow.get::<Transform>() else {
+                log::warn!("Camera follow an non transform ent");
+                return;
+            };
+            let follow_size = transform.scaled_size();
             let size = Vec2::new(
                 follow_size.x.min(self.deadzone.x),
                 follow_size.y.min(self.deadzone.y),
             );
             let half_size = size * 0.5;
             let follow_rect = Rect {
-                min: follow.pos - half_size,
-                max: follow.pos + half_size,
+                min: transform.pos - half_size,
+                max: transform.pos + half_size,
             };
             if follow_rect.min.x < self.deadzone_pos.x {
                 self.deadzone_pos.x = follow_rect.min.x;
@@ -97,7 +103,7 @@ impl Camera {
                 self.look_ahead_target.y = self.look_ahead.y;
             }
 
-            if self.snap_to_platform && follow.on_ground {
+            if self.snap_to_platform && follow.get::<Physics>().is_some_and(|phy| phy.on_ground) {
                 self.deadzone_pos.y = follow_rect.max.y - self.deadzone.y;
             }
 
@@ -134,7 +140,7 @@ impl Camera {
         self.force = true;
     }
 
-    pub fn follow(&mut self, entity_ref: EntRef, snap: bool) {
+    pub fn follow(&mut self, entity_ref: Ent, snap: bool) {
         self.follow.replace(entity_ref);
         self.snap = snap;
     }

@@ -16,11 +16,11 @@ use sdl2::{
 
 use crate::{
     color::Color,
+    ecs::world::World,
     engine::Engine,
     handle::{Handle, HandleId},
     input::{KeyCode, KeyState},
     types::Rect,
-    world::World,
 };
 
 use super::Platform;
