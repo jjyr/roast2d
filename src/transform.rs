@@ -14,6 +14,16 @@ pub struct Transform {
 }
 
 impl Transform {
+    pub fn new(pos: Vec2, size: Vec2) -> Self {
+        Self {
+            pos,
+            size,
+            z_index: 0,
+            scale: Vec2::splat(1.0),
+            angle: 0.0,
+        }
+    }
+
     pub fn scaled_size(&self) -> Vec2 {
         self.size * self.scale
     }

@@ -27,7 +27,7 @@ pub struct World {
 }
 
 impl World {
-    pub fn init_component<T: Component + Clone + 'static>(&mut self) {
+    pub fn init_component<T: Component + 'static>(&mut self) {
         let type_id = ComponentId::of::<T>();
         let name = type_name::<T>()
             .split("::")
