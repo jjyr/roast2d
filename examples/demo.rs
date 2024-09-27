@@ -1,7 +1,7 @@
 extern crate roast2d;
 use std::cell::RefCell;
 
-use roast2d::{hooks::Hooks, prelude::*};
+use roast2d::{collision::CollisionSet, hooks::Hooks, prelude::*};
 use roast2d_derive::Component;
 
 const BALL_ACCEL: f32 = 200.0;
@@ -46,8 +46,9 @@ impl Ball {
         let size = Vec2::new(32., 32.0);
         let color = Color::rgb(0xfb, 0xf2, 0x36);
 
-        let mut ent = w.spawn();
-        ent.add(Transform::new(pos, size))
+        let ent = w
+            .spawn()
+            .add(Transform::new(pos, size))
             .add(Physics {
                 group: EntGroup::PROJECTILE,
                 accel: Vec2::new(0.0, -BALL_ACCEL * 2.0),
@@ -56,9 +57,12 @@ impl Ball {
                 restitution: 12.0,
                 ..Default::default()
             })
-            .add(Hooks::new(Ball { size, color }));
+            .add(Hooks::new(Ball { size, color }))
+            .id();
 
-        ent.id()
+        w.get_resource_mut::<CollisionSet>().unwrap().add(ent);
+
+        ent
     }
 }
 
@@ -143,7 +147,8 @@ pub struct Wall;
 
 impl Wall {
     fn init(w: &mut World, pos: Vec2, size: Vec2) -> Ent {
-        w.spawn()
+        let ent = w
+            .spawn()
             .add(Transform::new(pos, size))
             .add(Physics {
                 check_against: EntGroup::PROJECTILE,
@@ -151,7 +156,9 @@ impl Wall {
                 ..Default::default()
             })
             .add(Wall)
-            .id()
+            .id();
+        w.get_resource_mut::<CollisionSet>().unwrap().add(ent);
+        ent
     }
 }
 
@@ -166,7 +173,8 @@ pub struct Brick {
 impl Brick {
     pub fn init(w: &mut World, pos: Vec2) -> Ent {
         let color = Color::rgb(0x5b, 0x6e, 0xe1);
-        w.spawn()
+        let ent = w
+            .spawn()
             .add(Transform::new(pos, BRICK_SIZE))
             .add(Physics {
                 check_against: EntGroup::PROJECTILE,
@@ -180,7 +188,9 @@ impl Brick {
                 color,
             })
             .add(Hooks::new(BrickHooks))
-            .id()
+            .id();
+        w.get_resource_mut::<CollisionSet>().unwrap().add(ent);
+        ent
     }
 }
 
@@ -195,10 +205,12 @@ impl EntHooks for BrickHooks {
         eng.draw_rect(t.size, t.pos + viewport, Some(color), Some(t.scale), None);
     }
 
-    fn kill(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) {
+    fn kill(&self, _eng: &mut Engine, w: &mut World, ent: Ent) {
         G.with_borrow_mut(|g| {
             g.score += 1;
         });
+
+        w.get_resource_mut::<CollisionSet>().unwrap().remove(ent);
     }
 
     fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) {
@@ -251,7 +263,8 @@ impl Player {
     pub fn init(w: &mut World, pos: Vec2) -> Ent {
         let size = Vec2::new(128.0, 48.0);
         let color = Color::rgb(0x37, 0x94, 0x6e);
-        w.spawn()
+        let ent = w
+            .spawn()
             .add(Transform::new(pos, size))
             .add(Physics {
                 friction: Vec2::splat(FRICTION),
@@ -261,7 +274,9 @@ impl Player {
             })
             .add(Player { color })
             .add(Hooks::new(PlayerHooks))
-            .id()
+            .id();
+        w.get_resource_mut::<CollisionSet>().unwrap().add(ent);
+        ent
     }
 }
 
