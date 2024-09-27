@@ -1,3 +1,5 @@
+use std::any::type_name;
+
 use super::{
     component::{Component, ComponentId},
     entity::Ent,
@@ -43,6 +45,19 @@ impl<'w> EntMut<'w> {
 
     pub fn id(&self) -> Ent {
         self.ent
+    }
+
+    pub fn add<T: Component + 'static>(&mut self, component: T) -> &mut Self {
+        let w = unsafe { self.world_ref.as_mut() };
+        if w.storage
+            .entry(ComponentId::of::<T>())
+            .or_default()
+            .insert(self.ent, Box::new(component))
+            .is_some()
+        {
+            panic!("Existed component {} {:?}", type_name::<T>(), self.ent);
+        }
+        self
     }
 
     pub fn get<T: Component + 'static>(&self) -> Option<&T> {

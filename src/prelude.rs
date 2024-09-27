@@ -10,6 +10,7 @@ pub use crate::entity_hooks::EntHooks;
 pub use crate::font::{Font, Text};
 pub use crate::handle::Handle;
 pub use crate::health::Health;
+pub use crate::hooks::Hooks;
 pub use crate::input::{ActionId, KeyCode, KeyState};
 pub use crate::map::Map;
 pub use crate::physics::{EntCollidesMode, EntGroup, EntPhysics, Physics};

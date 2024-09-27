@@ -13,6 +13,11 @@ pub struct Hooks {
 }
 
 impl Hooks {
+    pub fn new<T: EntHooks + 'static>(ent_hooks: T) -> Self {
+        Self {
+            hooks: Rc::new(ent_hooks),
+        }
+    }
     pub fn get(&self) -> Rc<dyn EntHooks> {
         self.hooks.clone()
     }
