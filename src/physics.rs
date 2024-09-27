@@ -1,17 +1,12 @@
-use std::any::{Any, TypeId};
-
 use bitflags::bitflags;
-use dyn_clone::DynClone;
 use glam::Vec2;
+use roast2d_derive::Component;
 
+use crate::collision::handle_trace_result;
 use crate::ecs::entity_ref::EntMut;
 use crate::prelude::Ent;
-use crate::{
-    collision::calc_bounds, ecs::world::World, engine::Engine, sprite::Sprite, trace::Trace,
-    types::Rect,
-};
-
-use crate::ecs::component::{Component, ComponentId};
+use crate::trace::trace;
+use crate::{ecs::world::World, engine::Engine};
 
 use super::transform::Transform;
 
@@ -77,6 +72,7 @@ impl EntPhysics {
     }
 }
 
+#[derive(Component)]
 pub struct Physics {
     pub physics: EntPhysics,
     pub on_ground: bool,
@@ -111,8 +107,6 @@ impl Default for Physics {
     }
 }
 
-impl Component for Physics {}
-
 /// Entity base update, handle physics velocities
 pub(crate) fn entity_base_update(eng: &mut Engine, w: &mut World, ent: Ent) {
     let Some(mut ent) = w.get_mut(ent) else {
@@ -144,27 +138,43 @@ pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
         .is_some_and(|phy| phy.physics.contains(EntPhysics::WORLD))
         && eng.collision_map.is_some()
     {
-        // let map = eng.collision_map.as_ref().unwrap();
-        // let t = trace(map, ent.pos, vstep, ent.scaled_size(), ent.angle);
-        // handle_trace_result(eng, ent, t.clone());
-        // // The previous trace was stopped short and we still have some velocity
-        // // left? Do a second trace with the new velocity. this allows us
-        // // to slide along tiles;
-        // if t.length < 1. {
-        //     let rotated_normal = Vec2::new(-t.normal.y, t.normal.x);
-        //     let vel_along_normal = vstep.dot(rotated_normal);
+        let map = eng.collision_map.as_ref().unwrap();
+        let Some(transform) = ent.get::<Transform>() else {
+            return;
+        };
+        let t = trace(
+            map,
+            transform.pos,
+            vstep,
+            transform.scaled_size(),
+            transform.angle,
+        );
+        handle_trace_result(eng, ent, t.clone());
+        // The previous trace was stopped short and we still have some velocity
+        // left? Do a second trace with the new velocity. this allows us
+        // to slide along tiles;
+        if t.length < 1. {
+            let rotated_normal = Vec2::new(-t.normal.y, t.normal.x);
+            let vel_along_normal = vstep.dot(rotated_normal);
 
-        //     if vel_along_normal != 0. {
-        //         let remaining = 1. - t.length;
-        //         let vstep2 = rotated_normal * (vel_along_normal * remaining);
-        //         let map = eng.collision_map.as_ref().unwrap();
-        //         let t2 = trace(map, ent.pos, vstep2, ent.scaled_size(), ent.angle);
-        //         handle_trace_result(eng, ent, t2);
-        //     }
-        // }
-    } else {
-        if let Some(mut transform) = ent.get_mut::<Transform>() {
-            transform.pos += vstep;
+            if vel_along_normal != 0. {
+                let remaining = 1. - t.length;
+                let vstep2 = rotated_normal * (vel_along_normal * remaining);
+                let map = eng.collision_map.as_ref().unwrap();
+                let Some(transform) = ent.get::<Transform>() else {
+                    return;
+                };
+                let t2 = trace(
+                    map,
+                    transform.pos,
+                    vstep2,
+                    transform.scaled_size(),
+                    transform.angle,
+                );
+                handle_trace_result(eng, ent, t2);
+            }
         }
+    } else if let Some(transform) = ent.get_mut::<Transform>() {
+        transform.pos += vstep;
     }
 }

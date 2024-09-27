@@ -1,4 +1,5 @@
 //! UnsafeWorldRef
+//!
 //! A usafe reference can access world,
 //! this implementation is a simplified version of bevy unsafe world cell
 //! https://github.com/bevyengine/bevy/blob/main/crates/bevy_ecs/src/world/unsafe_world_cell.rs

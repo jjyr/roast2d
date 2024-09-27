@@ -1,4 +1,4 @@
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 
 /// Entity type
 #[derive(Hash, PartialEq, Eq, Clone)]
@@ -19,4 +19,8 @@ impl From<TypeId> for ComponentId {
         Self(value)
     }
 }
-pub trait Component {}
+pub trait Component {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
+}

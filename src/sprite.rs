@@ -2,10 +2,10 @@ use core::fmt;
 use std::fmt::Debug;
 
 use glam::{UVec2, Vec2};
+use roast2d_derive::Component;
 
 use crate::{
     color::{Color, WHITE},
-    ecs::component::Component,
     handle::Handle,
 };
 
@@ -16,10 +16,8 @@ impl Debug for Sprite {
     }
 }
 
-impl Component for Sprite {}
-
 /// Sprite
-#[derive(Clone)]
+#[derive(Clone, Component)]
 pub struct Sprite {
     /// texture
     pub texture: Handle,

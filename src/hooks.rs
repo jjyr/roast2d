@@ -1,11 +1,13 @@
 use std::rc::Rc;
 
+use roast2d_derive::Component;
+
 use crate::{
-    ecs::component::Component,
     entity_hooks::EntHooks,
     prelude::{Ent, World},
 };
 
+#[derive(Component)]
 pub struct Hooks {
     hooks: Rc<dyn EntHooks>,
 }
@@ -15,8 +17,6 @@ impl Hooks {
         self.hooks.clone()
     }
 }
-
-impl Component for Hooks {}
 
 pub(crate) fn get_ent_hooks(w: &mut World, ent: Ent) -> Option<Rc<dyn EntHooks>> {
     w.get(ent)

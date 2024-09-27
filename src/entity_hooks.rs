@@ -4,6 +4,7 @@ use glam::Vec2;
 
 use crate::{
     engine::Engine,
+    health::Health,
     prelude::{Ent, World},
     sprite::Sprite,
     trace::Trace,
@@ -43,8 +44,8 @@ pub trait EntHooks {
     /// Called when entity is removed through kill
     fn kill(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) {}
 
-    // /// Called if one entity is touched by another entity
-    // fn touch(&mut self, _eng: &mut Engine, _w: &mut World, _ent: Ent, _other: Ent) {}
+    /// Called if one entity is touched by another entity
+    fn touch(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent, _other: Ent) {}
 
     /// Called when two entity are collide
     fn collide(
@@ -59,14 +60,15 @@ pub trait EntHooks {
 
     /// Called when entity get damage
     fn damage(&self, eng: &mut Engine, w: &mut World, ent: Ent, _other: Ent, damage: f32) {
-        // let Some(ent) = w.get_mut(ent) else {
-        //     return;
-        // };
-        // ent.health -= damage;
-        // if ent.health < 0.0 && ent.alive {
-        //     let ent_ref = ent.ent_ref;
-        //     eng.kill(ent_ref);
-        // }
+        let Some(mut ent) = w.get_mut(ent) else {
+            return;
+        };
+        if let Some(health) = ent.get_mut::<Health>() {
+            health.health -= damage;
+            if health.health < 0.0 && health.alive {
+                eng.kill(ent.id());
+            }
+        }
     }
 
     /// Called when entity is triggerred by another entity
