@@ -25,7 +25,7 @@ impl<'w> EntRef<'w> {
         w.storage
             .get(&ComponentId::of::<T>())?
             .get(&self.ent)
-            .map(|b| unsafe { &*<*const _>::cast(b) })
+            .and_then(|b| b.as_any().downcast_ref())
     }
 }
 
@@ -50,7 +50,7 @@ impl<'w> EntMut<'w> {
         w.storage
             .get(&ComponentId::of::<T>())?
             .get(&self.ent)
-            .map(|b| unsafe { &*<*const _>::cast(b) })
+            .and_then(|b| b.as_any().downcast_ref())
     }
 
     pub fn get_mut<T: Component + 'static>(&mut self) -> Option<&mut T> {
@@ -58,6 +58,6 @@ impl<'w> EntMut<'w> {
         w.storage
             .get_mut(&ComponentId::of::<T>())?
             .get_mut(&self.ent)
-            .map(|b| unsafe { &mut *<*mut _>::cast(b) })
+            .and_then(|b| b.as_any_mut().downcast_mut())
     }
 }

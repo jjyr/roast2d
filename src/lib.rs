@@ -25,3 +25,5 @@ pub mod sprite;
 pub mod trace;
 pub mod transform;
 pub mod types;
+
+extern crate self as roast2d;

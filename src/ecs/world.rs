@@ -1,11 +1,9 @@
 use std::{
-    any::{type_name, Any},
-    cell::UnsafeCell,
+    any::type_name,
     collections::{HashMap, HashSet},
-    rc::Rc,
 };
 
-use crate::{ecs::entity::Ent, sorts::insertion_sort_by_key, types::SweepAxis};
+use crate::ecs::entity::Ent;
 
 use super::{
     component::{Component, ComponentId},
@@ -29,7 +27,7 @@ pub struct World {
 }
 
 impl World {
-    pub(crate) fn init_component<T: Component + Clone + 'static>(&mut self) {
+    pub fn init_component<T: Component + Clone + 'static>(&mut self) {
         let type_id = ComponentId::of::<T>();
         let name = type_name::<T>()
             .split("::")
@@ -38,7 +36,7 @@ impl World {
         self.components_names.insert(name.to_string(), type_id);
     }
 
-    pub(crate) fn get_component_by_name(&self, name: &str) -> Option<&ComponentId> {
+    pub fn get_component_id_by_name(&self, name: &str) -> Option<&ComponentId> {
         self.components_names.get(name)
     }
 
@@ -54,6 +52,17 @@ impl World {
     pub fn add_resource<T: Resource + 'static>(&mut self, resource: T) {
         let id = ComponentId::of::<T>();
         self.resources.insert(id, Box::new(resource));
+    }
+
+    /// Remove Resource
+    pub fn remove_resource<T: Resource + 'static>(&mut self) -> Option<T> {
+        let id = ComponentId::of::<T>();
+        let r = self.resources.remove(&id)?;
+        if let Ok(r) = r.into_any().downcast::<T>() {
+            Some(*r)
+        } else {
+            None
+        }
     }
 
     /// Get Resource
@@ -157,8 +166,15 @@ impl World {
         }
     }
 
-    pub(crate) fn reset_entities(&mut self) {
+    /// Remove entities
+    pub fn clear_entities(&mut self) {
         self.entities.clear();
         self.storage.clear();
+    }
+
+    /// Remove entities and resources
+    pub fn clear(&mut self) {
+        self.clear_entities();
+        self.resources.clear();
     }
 }

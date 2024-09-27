@@ -25,11 +25,11 @@ pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// Equivalent to AssetReader, but nessacery for trait object safe
 pub trait ErasedAssetReader: Send + Sync + 'static {
     /// Returns a future to load the full file data at the provided path.
-    fn read<'a>(&'a self, path: &'a str) -> BoxedFuture<Result<Vec<u8>>>;
+    fn read<'a>(&'a self, path: &'a str) -> BoxedFuture<'a, Result<Vec<u8>>>;
 }
 
 impl<T: AssetReader> ErasedAssetReader for T {
-    fn read<'a>(&'a self, path: &'a str) -> BoxedFuture<Result<Vec<u8>>> {
+    fn read<'a>(&'a self, path: &'a str) -> BoxedFuture<'a, Result<Vec<u8>>> {
         Box::pin(async {
             let buf = Self::read(self, path).await?;
             Ok(buf)

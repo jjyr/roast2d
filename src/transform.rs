@@ -1,7 +1,9 @@
 use glam::Vec2;
+use roast2d_derive::Component;
 
-use crate::{collision::calc_bounds, ecs::component::Component, types::Rect};
+use crate::{collision::calc_bounds, types::Rect};
 
+#[derive(Component)]
 pub struct Transform {
     pub pos: Vec2,
     pub scale: Vec2,
@@ -21,5 +23,3 @@ impl Transform {
         calc_bounds(self.pos, half_size, self.angle)
     }
 }
-
-impl Component for Transform {}

@@ -1,18 +1,152 @@
 use std::f32::consts::PI;
 
 use glam::Vec2;
+use roast2d_derive::Resource;
 
 const ENTITY_MIN_BOUNCE_VELOCITY: f32 = 10.0;
 
 use crate::{
     ecs::{entity::Ent, entity_ref::EntMut, world::World},
     engine::Engine,
+    hooks::get_ent_hooks,
     physics::{entity_move, EntCollidesMode, EntPhysics, Physics},
     prelude::Transform,
     sat::{calc_sat_overlap, SatRect},
-    trace::{trace, Trace},
-    types::Rect,
+    sorts::insertion_sort_by_key,
+    trace::Trace,
+    types::{Rect, SweepAxis},
 };
+
+#[derive(Default, Resource)]
+pub struct CollisionState {
+    ents: Vec<Ent>,
+}
+
+impl CollisionState {
+    pub fn add(&mut self, ent: Ent) {
+        self.ents.push(ent);
+    }
+
+    pub(crate) fn sort_entities_for_sweep(&mut self, w: &mut World, sweep_axis: SweepAxis) {
+        let mut ents = core::mem::take(&mut self.ents);
+        insertion_sort_by_key(&mut ents, |ent| {
+            w.get(*ent)
+                .and_then(|ent| {
+                    ent.get::<Transform>()
+                        .map(|t| sweep_axis.get(t.bounds().min) as usize)
+                })
+                .unwrap_or(usize::MAX)
+        });
+        let _ = core::mem::replace(&mut self.ents, ents);
+    }
+}
+
+pub(crate) fn init_collision(_eng: &mut Engine, w: &mut World) {
+    w.add_resource(CollisionState::default());
+}
+
+pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
+    let Some(mut collision_state) = w.remove_resource::<CollisionState>() else {
+        return;
+    };
+
+    // Sort by x or y position
+    // insertion sort can gain better performance since list is sorted in every frames
+
+    let sweep_axis = eng.sweep_axis;
+    collision_state.sort_entities_for_sweep(w, sweep_axis);
+
+    // Sweep touches
+    eng.perf.checks = 0;
+    let ents_count = collision_state.ents.len();
+    for i in 0..ents_count {
+        let ent1 = collision_state.ents[i];
+        let (res, ent1_bounds) = {
+            let Some(ent1) = w.get(ent1) else {
+                continue;
+            };
+            let Some(phy1) = ent1.get::<Physics>() else {
+                continue;
+            };
+            let res = !phy1.check_against.is_empty()
+                || !phy1.group.is_empty()
+                || phy1.physics.is_at_least(EntPhysics::PASSIVE);
+
+            (res, ent1.get::<Transform>().unwrap().bounds())
+        };
+        if res {
+            let max_pos = sweep_axis.get(ent1_bounds.max);
+            for j in (i + 1)..ents_count {
+                let (ent2, ent2_bounds) = {
+                    let ent2 = collision_state.ents[j];
+                    let Some(ent_ref2) = w.get(ent2) else {
+                        continue;
+                    };
+                    let Some(t2) = ent_ref2.get::<Transform>() else {
+                        continue;
+                    };
+                    let ent2_bounds = t2.bounds();
+                    (ent2, ent2_bounds)
+                };
+                if sweep_axis.get(ent2_bounds.min) > max_pos {
+                    break;
+                }
+                eng.perf.checks += 1;
+                if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
+                    let res = {
+                        let [ent1, ent2] = w.many([ent1, ent2]);
+                        let Some(phy1) = ent1.get::<Physics>() else {
+                            continue;
+                        };
+                        let Some(phy2) = ent2.get::<Physics>() else {
+                            continue;
+                        };
+
+                        !(phy1.check_against & phy2.group).is_empty()
+                    };
+                    if res {
+                        if let Some(hook) = get_ent_hooks(w, ent1) {
+                            hook.touch(eng, w, ent1, ent2);
+                        }
+                    }
+                    let res = {
+                        let [ent1, ent2] = w.many([ent1, ent2]);
+                        let Some(phy1) = ent1.get::<Physics>() else {
+                            continue;
+                        };
+                        let Some(phy2) = ent2.get::<Physics>() else {
+                            continue;
+                        };
+                        !(phy1.group & phy2.check_against).is_empty()
+                    };
+                    if res {
+                        if let Some(hook) = get_ent_hooks(w, ent2) {
+                            hook.touch(eng, w, ent2, ent1);
+                        }
+                    }
+
+                    let res = {
+                        let [ent1, ent2] = w.many([ent1, ent2]);
+                        let Some(phy1) = ent1.get::<Physics>() else {
+                            continue;
+                        };
+                        let Some(phy2) = ent2.get::<Physics>() else {
+                            continue;
+                        };
+                        phy1.physics.bits() >= EntCollidesMode::LITE.bits()
+                            && phy2.physics.bits() >= EntCollidesMode::LITE.bits()
+                            && phy1.physics.bits().saturating_add(phy2.physics.bits())
+                                >= (EntCollidesMode::ACTIVE | EntCollidesMode::LITE).bits()
+                            && (phy1.mass + phy2.mass) > 0.0
+                    };
+                    if res {
+                        resolve_collision(eng, w, ent1, ent2, overlap);
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Resolve entity collision
 pub(crate) fn resolve_collision(eng: &mut Engine, w: &mut World, a: Ent, b: Ent, overlap: Vec2) {
@@ -160,7 +294,7 @@ pub(crate) fn entities_separate_on_y_axis(
     }
 }
 
-fn handle_trace_result(eng: &mut Engine, ent: &mut EntMut, t: Trace) {
+pub(crate) fn handle_trace_result(eng: &mut Engine, ent: &mut EntMut, t: Trace) {
     if let Some(transform) = ent.get_mut::<Transform>() {
         transform.pos = t.pos;
     }

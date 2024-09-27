@@ -1,7 +1,6 @@
 use std::{
-    any::{type_name, Any},
+    any::Any,
     cell::{RefCell, UnsafeCell},
-    rc::Rc,
     sync::OnceLock,
 };
 
@@ -11,25 +10,19 @@ use glam::{UVec2, Vec2};
 use crate::{
     asset::{AssetManager, FetchedTask},
     camera::Camera,
-    collision::{calc_ent_overlap, resolve_collision},
+    collision::{self, init_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
     color::Color,
     commands::{Command, Commands},
-    ecs::{
-        component::{Component, ComponentId},
-        entity::Ent,
-        entity_ref::EntMut,
-        world::World,
-    },
+    ecs::{entity::Ent, entity_ref::EntMut, world::World},
     font::Text,
     handle::Handle,
     health::Health,
-    hooks::{get_ent_hooks, Hooks},
+    hooks::get_ent_hooks,
     input::InputState,
     ldtk::{LayerType, LdtkProject},
     map::{map_draw, Map},
     physics::{self, entity_move},
-    physics::{EntCollidesMode, EntPhysics},
     platform::Platform,
     render::{Render, ResizeMode, ScaleMode},
     sprite::Sprite,
@@ -78,13 +71,13 @@ pub trait Scene {
 }
 
 #[derive(Default)]
-pub struct Perf {
-    entities: usize,
-    checks: usize,
+pub(crate) struct Perf {
+    pub entities: usize,
+    pub checks: usize,
     // draw_calls: usize,
-    update: f32,
-    draw: f32,
-    total: f32,
+    pub update: f32,
+    pub draw: f32,
+    pub total: f32,
 }
 
 pub struct Engine {
@@ -120,10 +113,10 @@ pub struct Engine {
     // Sweep axis
     // The axis (x or y) on which we want to do the broad phase collision detection
     // sweep & prune. For mosly horizontal games it should be x, for vertical ones y
-    sweep_axis: SweepAxis,
+    pub(crate) sweep_axis: SweepAxis,
 
     // Various infos about the last frame
-    perf: Perf,
+    pub(crate) perf: Perf,
 
     // states
     is_running: bool,
@@ -308,6 +301,9 @@ impl Engine {
         setup(self, world);
 
         self.time_real = self.now();
+
+        // init submodules
+        init_collision(self, world);
     }
 
     /// Scene base draw, draw maps and entities
@@ -372,73 +368,8 @@ impl Engine {
             }
         }
 
-        // TODO
-        // // Sort by x or y position
-        // // insertion sort can gain better performance since list is sorted in every frames
-        // let sweep_axis = self.sweep_axis;
-        // w.sort_entities_for_sweep(sweep_axis);
+        collision::update_collision(self, w);
 
-        // // Sweep touches
-        // self.perf.checks = 0;
-        // let entities_count = w.alloced();
-        // for i in 0..entities_count {
-        //     let ent1 = w.get_nth_ent(i).cloned().unwrap();
-        //     let (res, ent1_bounds) = {
-        //         let ent1 = w.get(ent1).unwrap();
-        //         let res = !ent1.check_against.is_empty()
-        //             || !ent1.group.is_empty()
-        //             || ent1.physics.is_at_least(EntPhysics::PASSIVE);
-
-        //         (res, ent1.bounds())
-        //     };
-        //     if res {
-        //         let max_pos = sweep_axis.get(ent1_bounds.max);
-        //         for j in (i + 1)..entities_count {
-        //             let (ent2, ent2_bounds) = {
-        //                 let ent2 = w.get_nth_ent(j).cloned().unwrap();
-        //                 let ent2_bounds = w.get(ent2).unwrap().bounds();
-        //                 (ent2, ent2_bounds)
-        //             };
-        //             if sweep_axis.get(ent2_bounds.min) > max_pos {
-        //                 break;
-        //             }
-        //             self.perf.checks += 1;
-        //             if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
-        //                 let res = {
-        //                     let [ent1, ent2] = w.many([ent1, ent2]);
-
-        //                     !(ent1.check_against & ent2.group).is_empty()
-        //                 };
-        //                 if res {
-        //                     w.with_ent(ent1, |w, ent1: Ent, instance: &mut dyn Component| {
-        //                         instance.touch(self, w, ent1, ent2);
-        //                     });
-        //                 }
-        //                 let res = {
-        //                     let [ent1, ent2] = w.many([ent1, ent2]);
-        //                     !(ent1.group & ent2.check_against).is_empty()
-        //                 };
-        //                 if res {
-        //                     w.with_ent(ent2, |w, ent2: Ent, instance: &mut dyn Component| {
-        //                         instance.touch(self, w, ent2, ent1);
-        //                     });
-        //                 }
-
-        //                 let res = {
-        //                     let [ent1, ent2] = w.many([ent1, ent2]);
-        //                     ent1.physics.bits() >= EntCollidesMode::LITE.bits()
-        //                         && ent2.physics.bits() >= EntCollidesMode::LITE.bits()
-        //                         && ent1.physics.bits().saturating_add(ent2.physics.bits())
-        //                             >= (EntCollidesMode::ACTIVE | EntCollidesMode::LITE).bits()
-        //                         && (ent1.mass + ent2.mass) > 0.0
-        //                 };
-        //                 if res {
-        //                     resolve_collision(self, w, ent1, ent2, overlap);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
         self.perf.entities = ents_count;
     }
 
@@ -456,8 +387,6 @@ impl Engine {
             if let Some(mut scene) = self.scene.take() {
                 scene.cleanup(self, w);
             }
-
-            w.reset_entities();
 
             self.background_maps.clear();
             self.collision_map = None;
@@ -547,12 +476,11 @@ impl Engine {
     /// Load level
     pub fn load_level(
         &mut self,
-        w: &mut World,
+        _w: &mut World,
         proj: &LdtkProject,
         identifier: &str,
     ) -> Result<()> {
         let level = proj.get_level(identifier)?;
-        w.reset_entities();
         self.background_maps.clear();
         self.collision_map.take();
         self.commands.take();
