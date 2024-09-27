@@ -18,13 +18,19 @@ use crate::{
 };
 
 #[derive(Default, Resource)]
-pub struct CollisionState {
+pub struct CollisionSet {
     ents: Vec<Ent>,
 }
 
-impl CollisionState {
+impl CollisionSet {
     pub fn add(&mut self, ent: Ent) {
         self.ents.push(ent);
+    }
+
+    pub fn remove(&mut self, ent: Ent) {
+        if let Some(index) = self.ents.iter().position(|id| *id == ent) {
+            self.ents.remove(index);
+        }
     }
 
     pub(crate) fn sort_entities_for_sweep(&mut self, w: &mut World, sweep_axis: SweepAxis) {
@@ -42,11 +48,11 @@ impl CollisionState {
 }
 
 pub(crate) fn init_collision(_eng: &mut Engine, w: &mut World) {
-    w.add_resource(CollisionState::default());
+    w.add_resource(CollisionSet::default());
 }
 
 pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
-    let Some(mut collision_state) = w.remove_resource::<CollisionState>() else {
+    let Some(mut collision_set) = w.remove_resource::<CollisionSet>() else {
         return;
     };
 
@@ -54,13 +60,13 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
     // insertion sort can gain better performance since list is sorted in every frames
 
     let sweep_axis = eng.sweep_axis;
-    collision_state.sort_entities_for_sweep(w, sweep_axis);
+    collision_set.sort_entities_for_sweep(w, sweep_axis);
 
     // Sweep touches
     eng.perf.checks = 0;
-    let ents_count = collision_state.ents.len();
+    let ents_count = collision_set.ents.len();
     for i in 0..ents_count {
-        let ent1 = collision_state.ents[i];
+        let ent1 = collision_set.ents[i];
         let (res, ent1_bounds) = {
             let Some(ent1) = w.get(ent1) else {
                 continue;
@@ -78,7 +84,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
             let max_pos = sweep_axis.get(ent1_bounds.max);
             for j in (i + 1)..ents_count {
                 let (ent2, ent2_bounds) = {
-                    let ent2 = collision_state.ents[j];
+                    let ent2 = collision_set.ents[j];
                     let Some(ent_ref2) = w.get(ent2) else {
                         continue;
                     };
@@ -146,6 +152,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
             }
         }
     }
+    w.add_resource(collision_set);
 }
 
 /// Resolve entity collision

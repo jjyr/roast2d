@@ -70,7 +70,7 @@ impl World {
         let id = ComponentId::of::<T>();
         self.resources
             .get(&id)
-            .map(|r| unsafe { &*<*const _>::cast(r) })
+            .and_then(|r| r.as_any().downcast_ref())
     }
 
     /// Get Resource mut
@@ -78,7 +78,7 @@ impl World {
         let id = ComponentId::of::<T>();
         self.resources
             .get_mut(&id)
-            .map(|r| unsafe { &mut *<*mut _>::cast(r) })
+            .and_then(|r| r.as_any_mut().downcast_mut())
     }
 
     /// Get an entity ref
