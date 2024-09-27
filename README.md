@@ -10,7 +10,7 @@ I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d
 
 ## Features
 
-- Poor man's ECS, no archetype, just a little bit ECS to improve the composition ability
+- [Poor man's ECS][poor-man-ecs], no archetype, just a little bit ECS to improve the composition ability
 - Simple physics and collision
 - [LDTK][LDTK] editor integration
 - Multi-platform (via SDL2 and WebAssembly)
@@ -59,3 +59,4 @@ The source code is licensed under MIT.
 [high_impact]: https://github.com/phoboslab/high_impact
 [demo]: https://github.com/jjyr/roast2d/tree/master/examples
 [balloon]: https://github.com/jjyr/balloon-game
+[poor-man-ecs]: https://github.com/jjyr/roast2d/pull/14
