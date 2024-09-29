@@ -1,7 +1,11 @@
 [package]
 name = "roast2d_derive"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+authors = ["jjy"]
+description = "Roast2D derive macros"
+license = "MIT"
+repository = "https://github.com/jjyr/roast2d"
 
 [lib]
 proc-macro = true
