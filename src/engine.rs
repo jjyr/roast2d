@@ -476,7 +476,7 @@ impl Engine {
     /// Load level
     pub fn load_level(
         &mut self,
-        _w: &mut World,
+        w: &mut World,
         proj: &LdtkProject,
         identifier: &str,
     ) -> Result<()> {
@@ -506,29 +506,31 @@ impl Engine {
                     self.background_maps.push(map);
                 }
                 LayerType::Entities => {
-                    // TODO spawn entities
-                    // for ent_ins in &layer.entity_instances {
-                    //     let pos = Vec2::new(
-                    //         (ent_ins.px.0 + ent_ins.width / 2) as f32,
-                    //         (ent_ins.px.1 + ent_ins.height / 2) as f32,
-                    //     );
-                    //     let ent_ref = {
-                    //         let ent_ref =
-                    //             self.spawn_with_type_name(w, ent_ins.identifier.clone(), pos);
-                    //         if let Some(ent) = w.get_mut(ent_ref) {
-                    //             ent.size.x = ent_ins.width as f32;
-                    //             ent.size.y = ent_ins.height as f32;
-                    //         }
-                    //         ent_ref
-                    //     };
-                    //     let settings = ent_ins
-                    //         .field_instances
-                    //         .iter()
-                    //         .map(|f| (f.identifier.clone(), f.value.clone()))
-                    //         .collect();
-
-                    //     self.setting(ent_ref, settings);
-                    // }
+                    // spawn entities
+                    for ent_ins in &layer.entity_instances {
+                        let pos = Vec2::new(
+                            (ent_ins.px.0 + ent_ins.width / 2) as f32,
+                            (ent_ins.px.1 + ent_ins.height / 2) as f32,
+                        );
+                        let ent = {
+                            let identifier = &ent_ins.identifier;
+                            let mut ent = w.spawn();
+                            // add transform
+                            ent.add(Transform::new(
+                                pos,
+                                Vec2::new(ent_ins.width as f32, ent_ins.height as f32),
+                            ))
+                            // add same name component
+                            .add_by_name(identifier);
+                            ent.id()
+                        };
+                        let settings = ent_ins
+                            .field_instances
+                            .iter()
+                            .map(|f| (f.identifier.clone(), f.value.clone()))
+                            .collect();
+                        self.setting(ent, settings);
+                    }
                 }
                 _ => {
                     log::error!("Ignore layer {} {:?}", layer.identifier, layer.r#type);

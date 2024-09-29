@@ -12,32 +12,46 @@ use super::{
     unsafe_world_ref::UnsafeWorldRef,
 };
 
+type NewComponentFunc = Box<dyn Fn() -> Box<dyn Component>>;
+
 /// World contains entities
 #[derive(Default)]
 pub struct World {
-    /// Unique id counter
+    /// Unique id
     unique_id: u32,
-    /// Live Ents
+    /// Entities
     entities: HashSet<Ent>,
     /// Component storage
     pub(crate) storage: HashMap<ComponentId, HashMap<Ent, Box<dyn Component>>>,
-    /// Name to Entity Types
-    components_names: HashMap<String, ComponentId>,
+    /// Resources
     resources: HashMap<ComponentId, Box<dyn Resource>>,
+    /// Component by name
+    component_by_name: HashMap<String, ComponentId>,
+    /// New component funcs
+    new_component_funcs: HashMap<ComponentId, NewComponentFunc>,
 }
 
 impl World {
-    pub fn init_component<T: Component + 'static>(&mut self) {
-        let type_id = ComponentId::of::<T>();
+    pub fn init_component<T: Component + Default + 'static>(&mut self) {
+        let component_id = ComponentId::of::<T>();
         let name = type_name::<T>()
             .split("::")
             .last()
-            .expect("can't get name of entity type");
-        self.components_names.insert(name.to_string(), type_id);
+            .expect("can't get name of component");
+        self.component_by_name
+            .insert(name.to_string(), component_id.clone());
+        let _ = self
+            .new_component_funcs
+            .insert(component_id, Box::new(|| Box::new(T::default())))
+            .expect("init duplicate component");
     }
 
-    pub fn get_component_id_by_name(&self, name: &str) -> Option<&ComponentId> {
-        self.components_names.get(name)
+    pub fn get_component_id_by_name(&self, name: &str) -> Option<ComponentId> {
+        self.component_by_name.get(name).cloned()
+    }
+
+    pub(crate) fn new_component(&self, id: &ComponentId) -> Option<Box<dyn Component>> {
+        self.new_component_funcs.get(id).map(|func| func())
     }
 
     fn to_unsafe_world_ref(&self) -> UnsafeWorldRef {

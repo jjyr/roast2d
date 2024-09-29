@@ -433,7 +433,7 @@ impl Scene for Demo {
     }
 }
 
-fn setup(eng: &mut Engine, w: &mut World) {
+fn setup(eng: &mut Engine, _w: &mut World) {
     // set resize and scale
     eng.set_view_size(Vec2::new(800.0, 600.0));
     eng.set_scale_mode(ScaleMode::Exact);
@@ -442,10 +442,6 @@ fn setup(eng: &mut Engine, w: &mut World) {
         height: true,
     });
     eng.set_sweep_axis(SweepAxis::Y);
-    w.init_component::<Player>();
-    w.init_component::<Wall>();
-    w.init_component::<Ball>();
-    w.init_component::<Brick>();
     eng.set_scene(Demo::default());
 }
 

@@ -60,6 +60,17 @@ impl<'w> EntMut<'w> {
         self
     }
 
+    pub fn add_by_name(&mut self, name: &str) -> Option<&mut Self> {
+        let w = unsafe { self.world_ref.as_mut() };
+        let component_id = w.get_component_id_by_name(name)?;
+        let component = w.new_component(&component_id)?;
+        w.storage
+            .entry(component_id)
+            .or_default()
+            .insert(self.ent, component)?;
+        Some(self)
+    }
+
     pub fn get<T: Component + 'static>(&self) -> Option<&T> {
         let w = unsafe { self.world_ref.as_ref() };
         w.storage
