@@ -26,4 +26,8 @@ pub mod trace;
 pub mod transform;
 pub mod types;
 
+/// re-export roast2d_derive
+pub use roast2d_derive as derive;
+
+/// Alias self crate to allow macro works
 extern crate self as roast2d;
