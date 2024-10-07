@@ -400,15 +400,15 @@ impl Scene for Demo {
         // Score
         let score = G.with_borrow(|g| g.score);
         eng.draw_text(
-            Text::new(format!("Score: {}", score), 30.0, WHITE),
-            Vec2::new(50.0, 20.0),
+            Text::new(format!("Score: {}", score), 20.0, WHITE),
+            Vec2::new(80.0, 20.0),
             None,
             None,
         );
         // FPS
         eng.draw_text(
-            Text::new(format!("FPS: {:.2}", self.fps), 30.0, WHITE),
-            Vec2::new(eng.view_size().x - 50.0, 20.0),
+            Text::new(format!("FPS: {:.2}", self.fps), 20.0, WHITE),
+            Vec2::new(eng.view_size().x - 80.0, 20.0),
             None,
             None,
         );
@@ -425,9 +425,6 @@ fn setup(eng: &mut Engine, _w: &mut World) {
     });
     eng.set_sweep_axis(SweepAxis::Y);
     eng.set_scene(Demo::default());
-
-    // TODO the font path only works on MacOS
-    eng.load_default_font("/Library/Fonts/Arial Unicode.ttf");
 }
 
 async fn run() {

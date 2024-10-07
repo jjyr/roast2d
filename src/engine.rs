@@ -9,14 +9,14 @@ use anyhow::{bail, Result};
 use glam::{UVec2, Vec2};
 
 use crate::{
-    asset::{AssetManager, FetchedTask},
+    asset::{Asset, AssetManager, AssetType, FetchedTask},
     camera::Camera,
     collision::{self, init_collision},
     collision_map::{CollisionMap, COLLISION_MAP},
     color::Color,
     commands::{Command, Commands},
     ecs::{entity::Ent, entity_ref::EntMut, world::World},
-    font::Text,
+    font::{Font, Text},
     handle::Handle,
     health::Health,
     hooks::get_ent_hooks,
@@ -37,6 +37,8 @@ use crate::{
 static DEFAULT_TEXTURE: OnceLock<Handle> = OnceLock::new();
 /// Max tick
 const ENGINE_MAX_TICK: f32 = 100.0;
+/// Default font
+const DEFAULT_FONT_BYTES: &[u8; 59164] = include_bytes!("../assets/Pixel Square 10.ttf");
 
 /// get default texture
 fn default_texture(eng: &mut Engine) -> Handle {
@@ -171,6 +173,11 @@ impl Engine {
     /// Load default font
     pub fn load_default_font<P: AsRef<Path>>(&mut self, path: P) {
         let handle = self.assets.load_font(path);
+        self.set_default_font(handle);
+    }
+
+    /// set default font
+    pub fn set_default_font(&mut self, handle: Handle) {
         self.render.borrow_mut().set_default_font(handle);
     }
 
@@ -326,14 +333,29 @@ impl Engine {
 
     pub(crate) fn init<Setup: FnOnce(&mut Engine, &mut World)>(&mut self, setup: Setup) {
         let world = unsafe { self.borrow_world() };
-        setup(self, world);
-
         self.time_real = self.now();
-
         // init submodules
         init_collision(self, world);
         // init textcache
         init_text_cache(self, world);
+        self.init_default_font(world);
+
+        setup(self, world);
+    }
+
+    pub(crate) fn init_default_font(&mut self, world: &mut World) {
+        // set default font
+        let handle = self.assets.insert(Asset {
+            asset_type: AssetType::Font,
+            bytes: None,
+        });
+        let font =
+            Font::from_bytes(DEFAULT_FONT_BYTES.into()).expect("Failed to load default font");
+        world
+            .get_resource_mut::<TextCache>()
+            .unwrap()
+            .add_font(handle.id(), font);
+        self.set_default_font(handle);
     }
 
     /// Scene base draw, draw maps and entities
