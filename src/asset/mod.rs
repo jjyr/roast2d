@@ -92,6 +92,12 @@ impl AssetManager {
         handle
     }
 
+    pub fn insert(&mut self, asset: Asset) -> Handle {
+        let handle = self.alloc_handle();
+        self.assets.insert(handle.id(), asset);
+        handle
+    }
+
     pub fn load_texture<P: AsRef<Path>>(&mut self, path: P) -> Handle {
         self.load(path, AssetType::Texture)
     }
