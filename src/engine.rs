@@ -1,6 +1,7 @@
 use std::{
     any::Any,
     cell::{RefCell, UnsafeCell},
+    path::Path,
     sync::OnceLock,
 };
 
@@ -26,6 +27,7 @@ use crate::{
     platform::Platform,
     render::{Render, ResizeMode, ScaleMode},
     sprite::Sprite,
+    text_cache::{init_text_cache, TextCache},
     trace::Trace,
     transform::Transform,
     types::SweepAxis,
@@ -166,19 +168,41 @@ impl Engine {
         f(r.platform.as_mut())
     }
 
-    /// Create text
-    pub fn create_text(&mut self, text: Text) -> Sprite {
-        let (handle, size) = self.create_text_texture(text);
-        Sprite::new(handle, size)
+    /// Load default font
+    pub fn load_default_font<P: AsRef<Path>>(&mut self, path: P) {
+        let handle = self.assets.load_font(path);
+        self.render.borrow_mut().set_default_font(handle);
+    }
+
+    /// Draw text
+    pub fn draw_text(&mut self, text: Text, pos: Vec2, scale: Option<Vec2>, angle: Option<f32>) {
+        let w = unsafe { self.borrow_world() };
+        if let Some(image) = w
+            .get_resource::<TextCache>()
+            .expect("text cache")
+            .get(&text)
+        {
+            // hit cache
+            self.draw_image(image, pos, scale, angle);
+        } else {
+            // render text texture
+            let (handle, size) = self.create_text_texture(w, &text);
+            let sprite = Sprite::new(handle, size);
+            self.draw_image(&sprite, pos, scale, angle);
+            w.get_resource_mut::<TextCache>().unwrap().add(text, sprite);
+        }
     }
 
     /// Create text texture
-    pub fn create_text_texture(&mut self, text: Text) -> (Handle, UVec2) {
+    pub fn create_text_texture(&mut self, w: &mut World, text: &Text) -> (Handle, UVec2) {
+        let text_cache = w
+            .get_resource_mut::<TextCache>()
+            .expect("can't get text cache");
         let handle = self.assets.alloc_handle();
         let size = self
             .render
             .borrow_mut()
-            .create_text_texture(handle.clone(), text);
+            .create_text_texture(text_cache, handle.clone(), text);
         (handle, size)
     }
 
@@ -296,14 +320,20 @@ impl Engine {
         &mut self.input
     }
 
+    unsafe fn borrow_world<'a>(&mut self) -> &'a mut World {
+        self.world.get().as_mut().unwrap()
+    }
+
     pub(crate) fn init<Setup: FnOnce(&mut Engine, &mut World)>(&mut self, setup: Setup) {
-        let world = unsafe { self.world.get().as_mut().unwrap() };
+        let world = unsafe { self.borrow_world() };
         setup(self, world);
 
         self.time_real = self.now();
 
         // init submodules
         init_collision(self, world);
+        // init textcache
+        init_text_cache(self, world);
     }
 
     /// Scene base draw, draw maps and entities
@@ -375,7 +405,7 @@ impl Engine {
 
     /// Called per frame, the main update logic of engine
     pub(crate) fn update(&mut self) {
-        let world = unsafe { self.world.get().as_mut().unwrap() };
+        let world = unsafe { self.borrow_world() };
         self.inner_update(world);
     }
 
@@ -445,6 +475,8 @@ impl Engine {
     }
 
     pub(crate) async fn handle_assets(&mut self) -> Result<()> {
+        let world = unsafe { self.borrow_world() };
+
         let tasks = self.assets.fetch().await?;
         for task in tasks {
             match task {
@@ -457,6 +489,20 @@ impl Engine {
                     self.with_platform(|p| {
                         p.remove_texture(handle);
                     });
+                }
+                FetchedTask::CreateFont { handle, font } => {
+                    let Some(cache) = world.get_resource_mut::<TextCache>() else {
+                        log::error!("Failed to get text cache");
+                        continue;
+                    };
+                    cache.add_font(handle.id(), font);
+                }
+                FetchedTask::RemoveFont { handle } => {
+                    let Some(cache) = world.get_resource_mut::<TextCache>() else {
+                        log::error!("Failed to get text cache");
+                        continue;
+                    };
+                    cache.remove_font(handle);
                 }
             }
         }

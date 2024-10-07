@@ -323,9 +323,7 @@ pub struct Demo {
     frames: f32,
     timer: f32,
     interval: f32,
-    font: Option<Font>,
-    score_text: Option<Sprite>,
-    fps_text: Option<Sprite>,
+    fps: f32,
 }
 
 impl Default for Demo {
@@ -334,9 +332,7 @@ impl Default for Demo {
             frames: 0.0,
             timer: 0.0,
             interval: 1.0,
-            score_text: None,
-            font: None,
-            fps_text: None,
+            fps: 0.0,
         }
     }
 }
@@ -351,14 +347,6 @@ impl Scene for Demo {
         input.bind(KeyCode::Right, Action::Right);
         input.bind(KeyCode::KeyA, Action::Left);
         input.bind(KeyCode::KeyD, Action::Right);
-
-        // TODO the font path only works on MacOS
-        let font_path = "/Library/Fonts/Arial Unicode.ttf";
-        if let Ok(font) = Font::open(font_path) {
-            self.font.replace(font);
-        } else {
-            log::error!("Failed to load font from {font_path}");
-        }
 
         Player::init(w, Vec2::new(108.0, view.y - 8.0));
         Ball::init(w, Vec2::new(40.0, view.y - 64.0));
@@ -401,35 +389,29 @@ impl Scene for Demo {
         self.frames += 1.0;
         self.timer += eng.tick;
         if self.timer > self.interval {
-            let fps = self.frames / self.timer;
+            self.fps = self.frames / self.timer;
             self.timer = 0.;
             self.frames = 0.;
-
-            if let Some(font) = self.font.clone() {
-                let content = format!("FPS: {:.2}", fps);
-                let text = Text::new(content, font, 30.0, WHITE);
-                let (texture, size) = eng.create_text_texture(text);
-                self.fps_text = Some(Sprite::new(texture, size));
-            }
-        }
-        if let Some(font) = self.font.clone() {
-            let score = G.with_borrow(|g| g.score);
-            let content = format!("Score: {}", score);
-            let text = Text::new(content, font.clone(), 30.0, WHITE);
-            let (texture, size) = eng.create_text_texture(text);
-            self.score_text = Some(Sprite::new(texture, size));
         }
     }
 
     fn draw(&mut self, eng: &mut Engine, w: &mut World) {
         eng.scene_base_draw(w);
-        if let Some(text) = self.score_text.as_ref() {
-            eng.draw_image(text, text.sizef() * 0.5, None, None);
-        }
-        if let Some(text) = self.fps_text.as_ref() {
-            let x = eng.view_size().x - (text.size().x as f32 * 0.5);
-            eng.draw_image(text, Vec2::new(x, text.sizef().y * 0.5), None, None);
-        }
+        // Score
+        let score = G.with_borrow(|g| g.score);
+        eng.draw_text(
+            Text::new(format!("Score: {}", score), 30.0, WHITE),
+            Vec2::new(50.0, 20.0),
+            None,
+            None,
+        );
+        // FPS
+        eng.draw_text(
+            Text::new(format!("FPS: {:.2}", self.fps), 30.0, WHITE),
+            Vec2::new(eng.view_size().x - 50.0, 20.0),
+            None,
+            None,
+        );
     }
 }
 
@@ -443,31 +425,26 @@ fn setup(eng: &mut Engine, _w: &mut World) {
     });
     eng.set_sweep_axis(SweepAxis::Y);
     eng.set_scene(Demo::default());
+
+    // TODO the font path only works on MacOS
+    eng.load_default_font("/Library/Fonts/Arial Unicode.ttf");
+}
+
+async fn run() {
+    App::default()
+        .title("Hello Roast2D".to_string())
+        .window(UVec2::new(800, 600))
+        .vsync(true)
+        .run(setup)
+        .await
+        .expect("Start game");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[pollster::main]
 async fn main() {
     env_logger::init();
-    App::default()
-        .title("Hello Roast2D".to_string())
-        .window(UVec2::new(800, 600))
-        .vsync(true)
-        .run(setup)
-        .await
-        .expect("Start game");
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen::prelude::wasm_bindgen(start)]
-pub async fn run() {
-    App::default()
-        .title("Hello Roast2D".to_string())
-        .window(UVec2::new(800, 600))
-        .vsync(true)
-        .run(setup)
-        .await
-        .expect("Start game");
+    run().await;
 }
 
 #[cfg(target_arch = "wasm32")]
