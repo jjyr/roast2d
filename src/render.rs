@@ -1,7 +1,8 @@
 use glam::{UVec2, Vec2};
 
 use crate::{
-    color::Color, font::Text, handle::Handle, platform::Platform, sprite::Sprite, types::Rect,
+    color::Color, font::Text, handle::Handle, platform::Platform, sprite::Sprite,
+    text_cache::TextCache, types::Rect,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -29,6 +30,7 @@ pub(crate) struct Render {
     resize_mode: ResizeMode,
     view_size: Vec2,
     pub(crate) platform: Box<dyn Platform + 'static>,
+    pub(crate) default_font: Option<Handle>,
 }
 
 impl Render {
@@ -43,7 +45,12 @@ impl Render {
             view_size: Vec2::new(1280.0, 720.0),
             resize_mode: ResizeMode::default(),
             platform,
+            default_font: None,
         }
+    }
+
+    pub(crate) fn set_default_font(&mut self, handle: Handle) {
+        self.default_font.replace(handle);
     }
 
     pub(crate) fn snap_px(&self, pos: Vec2) -> Vec2 {
@@ -187,14 +194,27 @@ impl Render {
         self.inv_screen_scale = 1.0 / self.screen_scale;
     }
 
-    pub(crate) fn create_text_texture(&mut self, handle: Handle, text: Text) -> UVec2 {
+    pub(crate) fn create_text_texture(
+        &mut self,
+        text_cache: &mut TextCache,
+        handle: Handle,
+        text: &Text,
+    ) -> UVec2 {
         let Text {
             text,
             font,
             scale,
             color,
         } = text;
-        let buffer = font.render_text_texture(&text, scale, color);
+        let font = text_cache
+            .get_font(
+                font.as_ref()
+                    .or(self.default_font.as_ref())
+                    .expect("no default font")
+                    .id(),
+            )
+            .expect("can't find font by handle id");
+        let buffer = font.render_text_texture(text, *scale, *color);
         let width = buffer.width();
         let height = buffer.height();
         let size = UVec2::new(width, height);

@@ -22,6 +22,7 @@ mod render;
 pub mod sat;
 pub mod sorts;
 pub mod sprite;
+pub mod text_cache;
 pub mod trace;
 pub mod transform;
 pub mod types;

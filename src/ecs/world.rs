@@ -79,6 +79,17 @@ impl World {
         }
     }
 
+    /// Temporarily remove resource
+    pub fn with_resource<T: Resource + 'static, R, F: FnOnce(&mut World, &mut T) -> R>(
+        &mut self,
+        handle: F,
+    ) {
+        if let Some(mut res) = self.remove_resource::<T>() {
+            handle(self, &mut res);
+            self.add_resource(res);
+        }
+    }
+
     /// Get Resource
     pub fn get_resource<T: Resource + 'static>(&self) -> Option<&T> {
         let id = ComponentId::of::<T>();

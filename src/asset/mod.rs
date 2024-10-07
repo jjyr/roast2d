@@ -5,11 +5,14 @@ use std::{
     sync::mpsc::{channel, Receiver, Sender},
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use glam::UVec2;
 use io::{get_default_reader, ErasedAssetReader};
 
-use crate::handle::{DropEvent, Handle, HandleId};
+use crate::{
+    font::Font,
+    handle::{DropEvent, Handle, HandleId},
+};
 
 mod io;
 
@@ -17,6 +20,7 @@ mod io;
 pub enum AssetType {
     Raw,
     Texture,
+    Font,
 }
 
 pub(crate) struct PendingTask {
@@ -34,6 +38,18 @@ pub(crate) enum FetchedTask {
     RemoveTexture {
         handle: u64,
     },
+    CreateFont {
+        handle: Handle,
+        font: Font,
+    },
+    RemoveFont {
+        handle: u64,
+    },
+}
+
+pub struct Asset {
+    pub asset_type: AssetType,
+    pub bytes: Option<Vec<u8>>,
 }
 
 pub struct AssetManager {
@@ -42,7 +58,7 @@ pub struct AssetManager {
     asset_id: u64,
     receiver: Receiver<DropEvent>,
     sender: Sender<DropEvent>,
-    assets: HashMap<HandleId, Vec<u8>>,
+    assets: HashMap<HandleId, Asset>,
 }
 
 impl AssetManager {
@@ -80,15 +96,19 @@ impl AssetManager {
         self.load(path, AssetType::Texture)
     }
 
+    pub fn load_font<P: AsRef<Path>>(&mut self, path: P) -> Handle {
+        self.load(path, AssetType::Font)
+    }
+
     pub fn load_bytes<P: AsRef<Path>>(&mut self, path: P) -> Handle {
         self.load(path, AssetType::Raw)
     }
 
-    pub fn get_raw(&self, handle: &Handle) -> Option<&Vec<u8>> {
+    pub fn get_asset(&self, handle: &Handle) -> Option<&Asset> {
         self.assets.get(&handle.id())
     }
 
-    pub fn remove_raw<P: AsRef<Path>>(&mut self, handle: &Handle) -> Option<Vec<u8>> {
+    pub fn remove_asset<P: AsRef<Path>>(&mut self, handle: &Handle) -> Option<Asset> {
         self.assets.remove(&handle.id())
     }
 
@@ -98,22 +118,41 @@ impl AssetManager {
         let mut tasks = Vec::default();
         // remove dropped assets
         while let Ok(event) = self.receiver.try_recv() {
-            self.assets.remove(&event.0);
-            let fetched_task = FetchedTask::RemoveTexture { handle: event.0 };
-            tasks.push(fetched_task);
+            let Some(asset) = self.assets.remove(&event.0) else {
+                continue;
+            };
+            match asset.asset_type {
+                AssetType::Raw => {
+                    // nothing todo
+                }
+                AssetType::Texture => {
+                    let fetched_task = FetchedTask::RemoveTexture { handle: event.0 };
+                    tasks.push(fetched_task);
+                }
+                AssetType::Font => {
+                    let fetched_task = FetchedTask::RemoveFont { handle: event.0 };
+                    tasks.push(fetched_task);
+                }
+            }
         }
         let pending = mem::take(&mut self.pending);
         // TODO Use task pool to poll assets
         for task in pending {
-            let raw = self.reader.read(task.path.to_str().unwrap()).await?;
+            let bytes = self.reader.read(task.path.to_str().unwrap()).await?;
             match task.asset_type {
                 AssetType::Raw => {
-                    self.assets.insert(task.handle.id(), raw);
+                    self.assets.insert(
+                        task.handle.id(),
+                        Asset {
+                            bytes: Some(bytes),
+                            asset_type: AssetType::Raw,
+                        },
+                    );
                 }
                 AssetType::Texture => {
                     let im = match image::ImageFormat::from_path(&task.path) {
-                        Ok(f) => image::load_from_memory_with_format(&raw, f),
-                        _ => image::load_from_memory(&raw),
+                        Ok(f) => image::load_from_memory_with_format(&bytes, f),
+                        _ => image::load_from_memory(&bytes),
                     }?;
                     let size = UVec2::new(im.width(), im.height());
                     let data = im.into_bytes();
@@ -123,6 +162,28 @@ impl AssetManager {
                         size,
                     };
                     tasks.push(fetched_task);
+                    self.assets.insert(
+                        task.handle.id(),
+                        Asset {
+                            bytes: None,
+                            asset_type: AssetType::Texture,
+                        },
+                    );
+                }
+                AssetType::Font => {
+                    let font = Font::from_bytes(bytes).ok_or(anyhow!("Failed to load font"))?;
+                    let fetched_task = FetchedTask::CreateFont {
+                        handle: task.handle.clone(),
+                        font,
+                    };
+                    tasks.push(fetched_task);
+                    self.assets.insert(
+                        task.handle.id(),
+                        Asset {
+                            bytes: None,
+                            asset_type: AssetType::Font,
+                        },
+                    );
                 }
             }
         }

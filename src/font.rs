@@ -1,10 +1,10 @@
-use std::{fs, path::Path};
+use std::{fs, hash::Hash, path::Path};
 
 use anyhow::{anyhow, Result};
 use image::{DynamicImage, ImageBuffer, Rgba};
 use rusttype::{point, Scale};
 
-use crate::color::Color;
+use crate::{color::Color, handle::Handle};
 
 #[derive(Clone)]
 pub struct Font {
@@ -69,20 +69,43 @@ impl Font {
     }
 }
 
+#[derive(PartialEq)]
 pub struct Text {
     pub text: String,
-    pub font: Font,
+    pub font: Option<Handle>,
     pub scale: f32,
     pub color: Color,
 }
 
+impl Eq for Text {}
+
+impl Hash for Text {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.text.hash(state);
+        self.font.hash(state);
+        self.font.hash(state);
+        // scale
+        state.write_u32(self.scale as u32);
+        // color
+        state.write_u8(self.color.r);
+        state.write_u8(self.color.g);
+        state.write_u8(self.color.b);
+        state.write_u8(self.color.a);
+    }
+}
+
 impl Text {
-    pub fn new(text: String, font: Font, scale: f32, color: Color) -> Self {
+    pub fn new(text: String, scale: f32, color: Color) -> Self {
         Self {
             text,
-            font,
             scale,
             color,
+            font: None,
         }
+    }
+
+    pub fn font(mut self, font: Handle) -> Self {
+        self.font.replace(font);
+        self
     }
 }
