@@ -176,28 +176,54 @@ impl Engine {
         self.set_default_font(handle);
     }
 
-    /// set default font
+    /// Set default font
     pub fn set_default_font(&mut self, handle: Handle) {
         self.render.borrow_mut().set_default_font(handle);
     }
 
     /// Draw text
-    pub fn draw_text(&mut self, text: Text, pos: Vec2, scale: Option<Vec2>, angle: Option<f32>) {
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Text
+    /// * `pos` - Position
+    /// * `anchor` - Anchor, center is (0.5, 0.5), min value (0.0, 0.0), max value (1.0, 1.0)
+    /// * `angle` - Angle to rotate
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::color::BLUE;
+    /// // draw a text with left-top anchor (0, 0)
+    /// # fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    ///    eng.draw_text(
+    ///        Text::new(format!("Hello"), 20.0, BLUE),
+    ///        Vec2::new(0.0, 20.0),
+    ///        Vec2::ZERO,
+    ///        None,
+    ///    );
+    /// # }
+    /// ```
+    pub fn draw_text(&mut self, text: Text, pos: Vec2, anchor: Vec2, angle: Option<f32>) {
         let w = unsafe { self.borrow_world() };
-        if let Some(image) = w
+        let (handle, size) = match w
             .get_resource::<TextCache>()
             .expect("text cache")
             .get(&text)
         {
-            // hit cache
-            self.draw_image(image, pos, scale, angle);
-        } else {
-            // render text texture
-            let (handle, size) = self.create_text_texture(w, &text);
-            let sprite = Sprite::new(handle, size);
-            self.draw_image(&sprite, pos, scale, angle);
-            w.get_resource_mut::<TextCache>().unwrap().add(text, sprite);
-        }
+            Some((handle, size)) => (handle.clone(), *size),
+            None => {
+                // render text texture
+                let (handle, size) = self.create_text_texture(w, &text);
+                w.get_resource_mut::<TextCache>()
+                    .unwrap()
+                    .add(text, (handle.clone(), size));
+                (handle, size)
+            }
+        };
+        let mut sprite = Sprite::new(handle, size);
+        sprite.anchor = anchor;
+        self.draw_image(&sprite, pos, None, angle);
     }
 
     /// Create text texture
@@ -214,18 +240,46 @@ impl Engine {
     }
 
     /// Draw rectangle
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - Size
+    /// * `pos` - Position
+    /// * `color` - Color, color of the rectangle
+    /// * `anchor` - Anchor, default is (0.5, 0.5), min value (0.0, 0.0), max value (1.0, 1.0)
+    /// * `scale` - Scale
+    /// * `angle` - Angle to rotate
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::color::BLUE;
+    /// // draw a blue rectangle
+    /// # fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    ///   eng.draw_rect(
+    ///       Vec2::splat(40.0),
+    ///       Vec2::new(50.0, 100.0) + viewport,
+    ///       None,
+    ///       Some(BLUE),
+    ///       None,
+    ///       None,
+    ///   );
+    /// # }
+    /// ```
     pub fn draw_rect(
         &mut self,
         size: Vec2,
         pos: Vec2,
-        color: Option<Color>,
+        color: Color,
+        anchor: Option<Vec2>,
         scale: Option<Vec2>,
         angle: Option<f32>,
     ) {
         let texture = default_texture(self);
         let mut image = Sprite::with_sizef(texture, size);
-        if let Some(color) = color {
-            image.color = color;
+        image.color = color;
+        if let Some(anchor) = anchor {
+            image.anchor = anchor;
         }
         self.render
             .borrow_mut()
@@ -233,6 +287,27 @@ impl Engine {
     }
 
     /// Draw image
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - Sprite to draw
+    /// * `pos` - Position
+    /// * `scale` - Scale
+    /// * `angle` - Angle to rotate
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // draw entity's sprite
+    /// # fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    ///   eng.draw_image(
+    ///       &ent.sprite,
+    ///       Vec2::new(50.0, 100.0) + viewport,
+    ///       None,
+    ///       None,
+    ///   );
+    /// # }
+    /// ```
     pub fn draw_image(
         &mut self,
         image: &Sprite,

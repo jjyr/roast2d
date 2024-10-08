@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
+use glam::UVec2;
 use roast2d_derive::Resource;
 
 use crate::{
     engine::Engine,
     font::{Font, Text},
+    handle::Handle,
     prelude::World,
-    sprite::Sprite,
 };
 
 /// Text cache
 #[derive(Resource)]
 pub struct TextCache {
     pub(crate) fonts: HashMap<u64, Font>,
-    pub(crate) cache: HashMap<Text, Sprite>,
+    pub(crate) cache: HashMap<Text, (Handle, UVec2)>,
     pub(crate) max_text_cache: usize,
 }
 
@@ -28,16 +29,16 @@ impl Default for TextCache {
 }
 
 impl TextCache {
-    pub fn add(&mut self, text: Text, sprite: Sprite) {
+    pub fn add(&mut self, text: Text, cache: (Handle, UVec2)) {
         if self.cache.len() > self.max_text_cache {
             // randomly clean cache
-            self.cache.retain(|_k, v| v.texture.id() & 1 == 0);
+            self.cache.retain(|_k, v| v.0.id() & 1 == 0);
         }
 
-        self.cache.insert(text, sprite);
+        self.cache.insert(text, cache);
     }
 
-    pub fn get(&self, text: &Text) -> Option<&Sprite> {
+    pub fn get(&self, text: &Text) -> Option<&(Handle, UVec2)> {
         self.cache.get(text)
     }
 

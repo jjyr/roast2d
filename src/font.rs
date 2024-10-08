@@ -104,6 +104,7 @@ impl Text {
         }
     }
 
+    /// Set font
     pub fn font(mut self, font: Handle) -> Self {
         self.font.replace(font);
         self

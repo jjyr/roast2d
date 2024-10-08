@@ -96,14 +96,13 @@ impl Render {
         scale: Option<Vec2>,
         angle: Option<f32>,
     ) {
-        let half_size = scale
+        let size = scale
             .map(|s| image.sizef() * s)
-            .unwrap_or_else(|| image.sizef())
-            * 0.5;
+            .unwrap_or_else(|| image.sizef());
 
         let dst = Rect {
-            min: pos - half_size,
-            max: pos + half_size,
+            min: pos - size * image.anchor,
+            max: pos + size * (Vec2::splat(1.0) - image.anchor),
         };
         self.draw(
             &image.texture,

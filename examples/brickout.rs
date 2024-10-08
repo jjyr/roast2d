@@ -73,7 +73,8 @@ impl EntHooks for Ball {
             eng.draw_rect(
                 self.size,
                 transform.pos + viewport,
-                Some(self.color),
+                self.color,
+                None,
                 Some(transform.scale),
                 None,
             );
@@ -202,7 +203,7 @@ impl EntHooks for BrickHooks {
         let ent = w.get(ent).unwrap();
         let t = ent.get::<Transform>().unwrap();
         let color = ent.get::<Brick>().unwrap().color;
-        eng.draw_rect(t.size, t.pos + viewport, Some(color), Some(t.scale), None);
+        eng.draw_rect(t.size, t.pos + viewport, color, None, Some(t.scale), None);
     }
 
     fn kill(&self, _eng: &mut Engine, w: &mut World, ent: Ent) {
@@ -288,7 +289,7 @@ impl EntHooks for PlayerHooks {
         let ent = w.get(ent).unwrap();
         let t = ent.get::<Transform>().unwrap();
         let p = ent.get::<Player>().unwrap();
-        eng.draw_rect(t.size, t.pos + viewport, Some(p.color), Some(t.scale), None);
+        eng.draw_rect(t.size, t.pos + viewport, p.color, None, Some(t.scale), None);
     }
 
     fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) {
@@ -401,15 +402,15 @@ impl Scene for Demo {
         let score = G.with_borrow(|g| g.score);
         eng.draw_text(
             Text::new(format!("Score: {}", score), 20.0, WHITE),
-            Vec2::new(80.0, 20.0),
-            None,
+            Vec2::new(0.0, 0.0),
+            Vec2::ZERO,
             None,
         );
         // FPS
         eng.draw_text(
             Text::new(format!("FPS: {:.2}", self.fps), 20.0, WHITE),
-            Vec2::new(eng.view_size().x - 80.0, 20.0),
-            None,
+            Vec2::new(eng.view_size().x - 160.0, 0.0),
+            Vec2::ZERO,
             None,
         );
     }

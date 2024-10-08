@@ -33,6 +33,8 @@ pub struct Sprite {
     pub flip_x: bool,
     /// Flip Vertical
     pub flip_y: bool,
+    /// Anchor default (0.5, 0.5) is center
+    pub anchor: Vec2,
 }
 
 impl Sprite {
@@ -46,6 +48,7 @@ impl Sprite {
             padding: 0.0,
             flip_x: false,
             flip_y: false,
+            anchor: Vec2::splat(0.5),
         }
     }
 
