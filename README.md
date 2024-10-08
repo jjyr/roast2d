@@ -18,7 +18,7 @@ I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d
 
 ## Examples
 
-* A copy of the classic [brick out][breakout] shows the basic usage 
+* A copy of the classic [breakout][breakout] shows the basic usage 
 * A 2D platformer prototype [balloon game][balloon] shows how to integrate with LDTK, kira (audio) and support web platform.
 
 ## Usage
