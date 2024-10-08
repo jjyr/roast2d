@@ -193,9 +193,9 @@ impl Engine {
     /// # Examples
     ///
     /// ```
-    /// # use crate::color::BLUE;
+    /// # use roast2d::prelude::*;
     /// // draw a text with left-top anchor (0, 0)
-    /// # fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    /// # fn draw(eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
     ///    eng.draw_text(
     ///        Text::new(format!("Hello"), 20.0, BLUE),
     ///        Vec2::new(0.0, 20.0),
@@ -253,14 +253,14 @@ impl Engine {
     /// # Examples
     ///
     /// ```
-    /// # use crate::color::BLUE;
+    /// # use roast2d::prelude::*;
     /// // draw a blue rectangle
-    /// # fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    /// # fn draw(eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
     ///   eng.draw_rect(
     ///       Vec2::splat(40.0),
     ///       Vec2::new(50.0, 100.0) + viewport,
+    ///       BLUE,
     ///       None,
-    ///       Some(BLUE),
     ///       None,
     ///       None,
     ///   );
@@ -298,10 +298,13 @@ impl Engine {
     /// # Examples
     ///
     /// ```
+    /// # use roast2d::prelude::*;
     /// // draw entity's sprite
-    /// # fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    /// # fn draw(eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    ///   let ent_ref = w.get(ent).unwrap();
+    ///   let sprite = ent_ref.get::<Sprite>().unwrap();
     ///   eng.draw_image(
-    ///       &ent.sprite,
+    ///       &sprite,
     ///       Vec2::new(50.0, 100.0) + viewport,
     ///       None,
     ///       None,
