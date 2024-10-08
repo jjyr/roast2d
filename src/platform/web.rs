@@ -1,4 +1,4 @@
-use hashbrown::Hashmap;
+use hashbrown::HashMap;
 use std::{
     borrow::Cow,
     sync::mpsc::{channel, Receiver},
