@@ -18,7 +18,7 @@ I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d
 
 ## Examples
 
-* A copy of the classic [brick out][brickout] shows the basic usage 
+* A copy of the classic [brick out][breakout] shows the basic usage 
 * A 2D platformer prototype [balloon game][balloon] shows how to integrate with LDTK, kira (audio) and support web platform.
 
 ## Usage
@@ -26,7 +26,7 @@ I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d
 Run example:
 
 ``` bash
-cargo run --example brickout
+cargo run --example breakout
 ```
 
 Add `roast2d` to Rust project:
@@ -57,6 +57,6 @@ The source code is licensed under MIT.
 [SDL2]: https://github.com/Rust-SDL2/rust-sdl2?tab=readme-ov-file#sdl20-development-libraries
 [LDTK]: https://ldtk.io/
 [high_impact]: https://github.com/phoboslab/high_impact
-[brickout]: https://github.com/jjyr/roast2d/tree/master/examples
+[breakout]: https://github.com/jjyr/roast2d/tree/master/examples
 [balloon]: https://github.com/jjyr/balloon-game
 [poor-man-ecs]: https://github.com/jjyr/roast2d/pull/14
