@@ -1,7 +1,5 @@
-use std::{
-    any::type_name,
-    collections::{HashMap, HashSet},
-};
+use hashbrown::{HashMap, HashSet};
+use std::any::type_name;
 
 use crate::ecs::entity::Ent;
 

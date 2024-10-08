@@ -1,4 +1,5 @@
-use std::{collections::HashMap, time::Instant};
+use hashbrown::HashMap;
+use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use glam::{UVec2, Vec2};

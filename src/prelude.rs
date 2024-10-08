@@ -21,5 +21,6 @@ pub use crate::transform::Transform;
 pub use crate::types::{Rect, SweepAxis};
 pub use anyhow::{self, Error, Result};
 pub use glam::{self, IVec2, UVec2, Vec2, Vec3};
+pub use hashbrown;
 pub use serde;
 pub use serde_json;

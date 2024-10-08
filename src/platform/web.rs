@@ -1,6 +1,6 @@
+use hashbrown::Hashmap;
 use std::{
     borrow::Cow,
-    collections::HashMap,
     sync::mpsc::{channel, Receiver},
 };
 

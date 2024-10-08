@@ -1,5 +1,5 @@
+use hashbrown::HashMap;
 use std::{
-    collections::HashMap,
     mem,
     path::{Path, PathBuf},
     sync::mpsc::{channel, Receiver, Sender},
