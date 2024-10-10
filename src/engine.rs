@@ -436,6 +436,11 @@ impl Engine {
         self.set_default_font(handle);
     }
 
+    pub(crate) fn resize(&mut self, size: UVec2) {
+        self.render.borrow_mut().resize(size);
+        self.camera.force = true;
+    }
+
     /// Scene base draw, draw maps and entities
     pub fn scene_base_draw(&mut self, w: &mut World) {
         let viewport = self.viewport();

@@ -47,7 +47,7 @@ pub struct Camera {
     pos: Vec2,
     vel: Vec2,
     snap: bool,
-    force: bool,
+    pub(crate) force: bool,
 }
 
 impl Camera {
@@ -128,6 +128,10 @@ impl Camera {
                 self.snap = false;
             }
         }
+    }
+
+    pub fn pos(&self) -> Vec2 {
+        self.pos
     }
 
     pub fn move_pos(&mut self, pos: Vec2) {
