@@ -438,7 +438,8 @@ impl Engine {
         self.set_default_font(handle);
     }
 
-    pub(crate) fn resize(&mut self, size: UVec2) {
+    #[allow(dead_code)]
+    pub(crate) fn on_resize(&mut self, size: UVec2) {
         self.render.borrow_mut().resize(size);
     }
 

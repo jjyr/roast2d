@@ -200,7 +200,7 @@ impl Platform for SDLPlatform {
         // Obtained samplerate might be different from requested
         // platform_output_samplerate = obtained_spec.freq;
         engine.init(setup);
-        engine.resize(event_handler.window.drawable_size().into());
+        engine.on_resize(event_handler.window.drawable_size().into());
 
         while !event_handler.wants_to_exit {
             if let Err(err) = engine.handle_assets().await {
