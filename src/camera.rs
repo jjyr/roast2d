@@ -47,7 +47,7 @@ pub struct Camera {
     pos: Vec2,
     vel: Vec2,
     snap: bool,
-    pub(crate) force: bool,
+    force: bool,
 }
 
 impl Camera {

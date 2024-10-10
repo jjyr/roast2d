@@ -204,7 +204,7 @@ impl Engine {
     ///    );
     /// # }
     /// ```
-    pub fn draw_text(&mut self, text: Text, pos: Vec2, anchor: Vec2, angle: Option<f32>) {
+    pub fn draw_text(&mut self, mut text: Text, pos: Vec2, anchor: Vec2, angle: Option<f32>) {
         let w = unsafe { self.borrow_world() };
         let (handle, size) = match w
             .get_resource::<TextCache>()
@@ -214,7 +214,9 @@ impl Engine {
             Some((handle, size)) => (handle.clone(), *size),
             None => {
                 // render text texture
+                text.scale *= 2.0;
                 let (handle, size) = self.create_text_texture(w, &text);
+                let size = size / 2;
                 w.get_resource_mut::<TextCache>()
                     .unwrap()
                     .add(text, (handle.clone(), size));
@@ -438,7 +440,6 @@ impl Engine {
 
     pub(crate) fn resize(&mut self, size: UVec2) {
         self.render.borrow_mut().resize(size);
-        self.camera.force = true;
     }
 
     /// Scene base draw, draw maps and entities
