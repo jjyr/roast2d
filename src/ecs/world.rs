@@ -166,10 +166,46 @@ impl World {
     }
 
     /// Iterate entities
-    pub fn iter_ent_refs(&self) -> impl Iterator<Item = EntRef> {
+    pub fn iter_ents_ref(&self) -> impl Iterator<Item = EntRef> {
         self.entities.iter().map(|ent| {
             let world_ref = UnsafeWorldRef::new_readonly(self);
             EntRef::new(*ent, world_ref)
+        })
+    }
+
+    /// Iterate entities
+    pub fn iter_ents_mut(&mut self) -> impl Iterator<Item = EntMut> {
+        self.entities.iter().map(|ent| {
+            let world_ref = UnsafeWorldRef::new_readonly(self);
+            EntMut::new(*ent, world_ref)
+        })
+    }
+
+    /// Iterate component
+    pub fn iter_by<T: Component + 'static>(&self) -> Option<impl Iterator<Item = &Ent>> {
+        let component_id = ComponentId::of::<T>();
+        self.storage.get(&component_id).map(|v| v.keys())
+    }
+
+    /// Iterate component
+    pub fn iter_ref_by<T: Component + 'static>(&self) -> Option<impl Iterator<Item = EntRef>> {
+        let component_id = ComponentId::of::<T>();
+        self.storage.get(&component_id).map(|v| {
+            v.keys().map(|ent| {
+                let world_ref = UnsafeWorldRef::new_readonly(self);
+                EntRef::new(*ent, world_ref)
+            })
+        })
+    }
+
+    /// Iterate component
+    pub fn iter_mut_by<T: Component + 'static>(&mut self) -> Option<impl Iterator<Item = EntMut>> {
+        let component_id = ComponentId::of::<T>();
+        self.storage.get(&component_id).map(|v| {
+            v.keys().map(|ent| {
+                let world_ref = UnsafeWorldRef::new_readonly(self);
+                EntMut::new(*ent, world_ref)
+            })
         })
     }
 

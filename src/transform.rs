@@ -24,6 +24,11 @@ impl Transform {
         }
     }
 
+    pub fn with_z_index(mut self, z_index: u32) -> Self {
+        self.z_index = z_index;
+        self
+    }
+
     pub fn scaled_size(&self) -> Vec2 {
         self.size * self.scale
     }

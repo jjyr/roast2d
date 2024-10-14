@@ -475,7 +475,7 @@ impl Engine {
     fn entities_draw(&mut self, w: &mut World, viewport: Vec2) {
         // Sort entities by draw_order
         let mut ents: Vec<_> = w
-            .iter_ent_refs()
+            .iter_ents_ref()
             .filter_map(|ent_ref| {
                 let transform = ent_ref.get::<Transform>()?;
                 Some((ent_ref.id(), transform.z_index))
