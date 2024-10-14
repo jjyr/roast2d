@@ -4,9 +4,10 @@ use std::cell::RefCell;
 use roast2d::{collision::CollisionSet, hooks::Hooks, prelude::*};
 use roast2d_derive::Component;
 
-const BALL_ACCEL: f32 = 200.0;
-const BALL_MAX_VEL: f32 = 300.0;
-const PLAYER_VEL: f32 = 600.0;
+const BALL_ACCEL: f32 = 100.0;
+const BALL_MIN_VEL: f32 = 180.0;
+const BALL_MAX_VEL: f32 = 280.0;
+const PLAYER_VEL: f32 = 400.0;
 const FRICTION: f32 = 4.0;
 const WALL_THICK: f32 = 200.0;
 const BRICK_SIZE: Vec2 = Vec2::new(64., 32.);
@@ -51,12 +52,14 @@ impl Ball {
             .add(Transform::new(pos, size))
             .add(Physics {
                 group: EntGroup::PROJECTILE,
-                accel: Vec2::new(0.0, -BALL_ACCEL * 2.0),
+                vel: Vec2::new(0.0, -BALL_MAX_VEL),
                 friction: Vec2::splat(0.1),
                 physics: EntPhysics::LITE,
                 restitution: 12.0,
+                gravity: 0.0,
                 ..Default::default()
             })
+            .add(Ball { size, color })
             .add(Hooks::new(Ball { size, color }))
             .id();
 
@@ -139,6 +142,10 @@ impl EntHooks for Ball {
             if let Some(p) = ent.get_mut::<Physics>() {
                 p.vel.y = -BALL_MAX_VEL;
             }
+        }
+
+        if let Some(p) = ent.get_mut::<Physics>() {
+            p.vel.y = p.vel.y.abs().clamp(BALL_MIN_VEL, BALL_MAX_VEL) * p.vel.y.signum();
         }
     }
 }
@@ -262,7 +269,7 @@ pub struct Player {
 
 impl Player {
     pub fn init(w: &mut World, pos: Vec2) -> Ent {
-        let size = Vec2::new(128.0, 48.0);
+        let size = Vec2::new(160.0, 48.0);
         let color = Color::rgb(0x37, 0x94, 0x6e);
         let ent = w
             .spawn()
@@ -314,8 +321,8 @@ impl EntHooks for PlayerHooks {
         if other.get::<Ball>().is_some() {
             let p1 = ent.get_mut::<Physics>().unwrap();
             let p2 = other.get_mut::<Physics>().unwrap();
-            p2.vel.x = (p2.vel.x * 0.5 + p1.vel.x).clamp(-BALL_MAX_VEL, BALL_MAX_VEL);
-            p2.accel.x = p2.vel.normalize().x * p2.accel.x.abs();
+            p2.accel.x += p1.vel.x * 0.6;
+            p2.vel.x = p2.accel.x.signum() * p2.vel.x.abs();
         }
     }
 }
