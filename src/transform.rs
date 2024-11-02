@@ -3,7 +3,7 @@ use roast2d_derive::Component;
 
 use crate::{collision::calc_bounds, types::Rect};
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct Transform {
     pub pos: Vec2,
     pub scale: Vec2,
