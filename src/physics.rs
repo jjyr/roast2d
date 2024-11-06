@@ -109,10 +109,10 @@ impl Default for Physics {
 
 /// Entity base update, handle physics velocities
 pub(crate) fn entity_base_update(eng: &mut Engine, w: &mut World, ent: Ent) {
-    let Some(mut ent) = w.get_mut(ent) else {
+    let Ok(mut ent) = w.get_mut(ent) else {
         return;
     };
-    let Some(phy) = ent.get_mut::<Physics>() else {
+    let Ok(phy) = ent.get_mut::<Physics>() else {
         return;
     };
     if !phy.physics.contains(EntPhysics::MOVE) {
@@ -135,11 +135,11 @@ pub(crate) fn entity_base_update(eng: &mut Engine, w: &mut World, ent: Ent) {
 pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
     if ent
         .get::<Physics>()
-        .is_some_and(|phy| phy.physics.contains(EntPhysics::WORLD))
+        .is_ok_and(|phy| phy.physics.contains(EntPhysics::WORLD))
         && eng.collision_map.is_some()
     {
         let map = eng.collision_map.as_ref().unwrap();
-        let Some(transform) = ent.get::<Transform>() else {
+        let Ok(transform) = ent.get::<Transform>() else {
             return;
         };
         let t = trace(
@@ -161,7 +161,7 @@ pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
                 let remaining = 1. - t.length;
                 let vstep2 = rotated_normal * (vel_along_normal * remaining);
                 let map = eng.collision_map.as_ref().unwrap();
-                let Some(transform) = ent.get::<Transform>() else {
+                let Ok(transform) = ent.get::<Transform>() else {
                     return;
                 };
                 let t2 = trace(
@@ -174,7 +174,7 @@ pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
                 handle_trace_result(eng, ent, t2);
             }
         }
-    } else if let Some(transform) = ent.get_mut::<Transform>() {
+    } else if let Ok(transform) = ent.get_mut::<Transform>() {
         transform.pos += vstep;
     }
 }

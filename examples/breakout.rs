@@ -70,19 +70,18 @@ impl Ball {
 }
 
 impl EntHooks for Ball {
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Option<()> {
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
-        if let Some(transform) = ent.get::<Transform>() {
-            eng.draw_rect(
-                self.size,
-                transform.pos + viewport,
-                self.color,
-                None,
-                Some(transform.scale),
-                None,
-            );
-        }
-        None
+        let transform = ent.get::<Transform>()?;
+        eng.draw_rect(
+            self.size,
+            transform.pos + viewport,
+            self.color,
+            None,
+            Some(transform.scale),
+            None,
+        );
+        Ok(())
     }
 
     fn collide(
@@ -92,7 +91,7 @@ impl EntHooks for Ball {
         ent: Ent,
         normal: Vec2,
         _trace: Option<&Trace>,
-    ) -> Option<()> {
+    ) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let t = ent.get_mut::<Physics>()?;
 
@@ -104,10 +103,10 @@ impl EntHooks for Ball {
             t.vel.x = normal.x * BALL_MAX_VEL;
             t.accel.x = normal.x * BALL_ACCEL;
         }
-        None
+        Ok(())
     }
 
-    fn post_update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Option<()> {
+    fn post_update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let view = eng.view_size();
         let t = ent.get::<Transform>()?;
@@ -130,11 +129,10 @@ impl EntHooks for Ball {
             ent.get_mut::<Physics>()?.vel.y = -BALL_MAX_VEL;
         }
 
-        if let Some(p) = ent.get_mut::<Physics>() {
-            p.vel.y = p.vel.y.abs().clamp(BALL_MIN_VEL, BALL_MAX_VEL) * p.vel.y.signum();
-        }
+        let p = ent.get_mut::<Physics>()?;
+        p.vel.y = p.vel.y.abs().clamp(BALL_MIN_VEL, BALL_MAX_VEL) * p.vel.y.signum();
 
-        None
+        Ok(())
     }
 }
 
@@ -194,24 +192,24 @@ impl Brick {
 pub struct BrickHooks;
 
 impl EntHooks for BrickHooks {
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Option<()> {
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
         let t = ent.get::<Transform>()?;
         let color = ent.get::<Brick>()?.color;
         eng.draw_rect(t.size, t.pos + viewport, color, None, Some(t.scale), None);
-        None
+        Ok(())
     }
 
-    fn kill(&self, _eng: &mut Engine, w: &mut World, ent: Ent) -> Option<()> {
+    fn kill(&self, _eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         G.with_borrow_mut(|g| {
             g.score += 1;
         });
 
         w.get_resource_mut::<CollisionSet>()?.remove(ent);
-        None
+        Ok(())
     }
 
-    fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Option<()> {
+    fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         if ent.get::<Brick>()?.hit {
             let ent_id = ent.id();
@@ -239,10 +237,10 @@ impl EntHooks for BrickHooks {
             let t = ent.get_mut::<Transform>()?;
             t.scale = Vec2::splat(scale);
         }
-        None
+        Ok(())
     }
 
-    fn touch(&self, _eng: &mut Engine, w: &mut World, ent: Ent, _other: Ent) -> Option<()> {
+    fn touch(&self, _eng: &mut Engine, w: &mut World, ent: Ent, _other: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let brick = ent.get_mut::<Brick>()?;
         if !brick.hit {
@@ -250,7 +248,7 @@ impl EntHooks for BrickHooks {
             let pos = ent.get::<Transform>()?.pos;
             ent.get_mut::<Brick>()?.dead_pos = pos;
         }
-        None
+        Ok(())
     }
 }
 
@@ -284,15 +282,15 @@ impl Player {
 pub struct PlayerHooks;
 
 impl EntHooks for PlayerHooks {
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Option<()> {
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
         let t = ent.get::<Transform>()?;
         let p = ent.get::<Player>()?;
         eng.draw_rect(t.size, t.pos + viewport, p.color, None, Some(t.scale), None);
-        None
+        Ok(())
     }
 
-    fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Option<()> {
+    fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let phy = ent.get_mut::<Physics>()?;
 
@@ -305,18 +303,18 @@ impl EntHooks for PlayerHooks {
         if input.pressed(Action::Left) {
             phy.vel.x = -PLAYER_VEL;
         }
-        None
+        Ok(())
     }
 
-    fn touch(&self, _eng: &mut Engine, w: &mut World, ent: Ent, other: Ent) -> Option<()> {
+    fn touch(&self, _eng: &mut Engine, w: &mut World, ent: Ent, other: Ent) -> Result<()> {
         let [mut ent, mut other] = w.many_mut([ent, other]);
-        if other.get::<Ball>().is_some() {
+        if other.get::<Ball>().is_ok() {
             let p1 = ent.get_mut::<Physics>()?;
             let p2 = other.get_mut::<Physics>()?;
             p2.accel.x += p1.vel.x * 0.6;
             p2.vel.x = p2.accel.x.signum() * p2.vel.x.abs();
         }
-        None
+        Ok(())
     }
 }
 

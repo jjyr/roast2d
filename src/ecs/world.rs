@@ -1,7 +1,7 @@
 use hashbrown::{HashMap, HashSet};
 use std::any::type_name;
 
-use crate::ecs::entity::Ent;
+use crate::{ecs::entity::Ent, errors::Error};
 
 use super::{
     component::{Component, ComponentId},
@@ -89,54 +89,58 @@ impl World {
     }
 
     /// Get Resource
-    pub fn get_resource<T: Resource + 'static>(&self) -> Option<&T> {
+    pub fn get_resource<T: Resource + 'static>(&self) -> Result<&T, Error> {
         let id = ComponentId::of::<T>();
         self.resources
             .get(&id)
             .and_then(|r| r.as_any().downcast_ref())
+            .ok_or(Error::NoResource)
     }
 
     /// Get Resource mut
-    pub fn get_resource_mut<T: Resource + 'static>(&mut self) -> Option<&mut T> {
+    pub fn get_resource_mut<T: Resource + 'static>(&mut self) -> Result<&mut T, Error> {
         let id = ComponentId::of::<T>();
         self.resources
             .get_mut(&id)
             .and_then(|r| r.as_any_mut().downcast_mut())
+            .ok_or(Error::NoResource)
     }
 
     /// Get an entity ref
-    pub fn get(&self, ent: Ent) -> Option<EntRef> {
+    pub fn get(&self, ent: Ent) -> Result<EntRef, Error> {
         if self.entities.contains(&ent) {
-            Some(EntRef::new(ent, self.to_unsafe_world_ref()))
+            Ok(EntRef::new(ent, self.to_unsafe_world_ref()))
         } else {
-            None
+            Err(Error::NoEntity)
         }
     }
 
     /// Get an entity by ref
-    pub fn get_mut(&mut self, ent: Ent) -> Option<EntMut> {
+    pub fn get_mut(&mut self, ent: Ent) -> Result<EntMut, Error> {
         if self.entities.contains(&ent) {
-            Some(EntMut::new(ent, self.to_unsafe_world_mut()))
+            Ok(EntMut::new(ent, self.to_unsafe_world_mut()))
         } else {
-            None
+            Err(Error::NoEntity)
         }
     }
 
     /// Get many entity
-    pub fn get_many<const N: usize>(&self, ents: [Ent; N]) -> [Option<EntRef>; N] {
-        ents.map(|ent| self.get(ent))
+    pub fn get_many<const N: usize>(&self, ents: [Ent; N]) -> Result<Vec<EntRef>, Error> {
+        ents.map(|ent| self.get(ent)).into_iter().collect()
     }
 
     /// Get many entity mut
-    pub fn get_many_mut<const N: usize>(&mut self, ents: [Ent; N]) -> [Option<EntMut>; N] {
+    pub fn get_many_mut<const N: usize>(&mut self, ents: [Ent; N]) -> Result<Vec<EntMut>, Error> {
         ents.map(|ent| {
             if self.entities.contains(&ent) {
                 let world_ref = UnsafeWorldRef::new_readonly(self);
-                Some(EntMut::new(ent, world_ref))
+                Ok(EntMut::new(ent, world_ref))
             } else {
-                None
+                Err(Error::NoEntity)
             }
         })
+        .into_iter()
+        .collect()
     }
 
     /// Get many entity

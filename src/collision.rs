@@ -68,10 +68,10 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
     for i in 0..ents_count {
         let ent1 = collision_set.ents[i];
         let (res, ent1_bounds) = {
-            let Some(ent1) = w.get(ent1) else {
+            let Ok(ent1) = w.get(ent1) else {
                 continue;
             };
-            let Some(phy1) = ent1.get::<Physics>() else {
+            let Ok(phy1) = ent1.get::<Physics>() else {
                 continue;
             };
             let res = !phy1.check_against.is_empty()
@@ -85,10 +85,10 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
             for j in (i + 1)..ents_count {
                 let (ent2, ent2_bounds) = {
                     let ent2 = collision_set.ents[j];
-                    let Some(ent_ref2) = w.get(ent2) else {
+                    let Ok(ent_ref2) = w.get(ent2) else {
                         continue;
                     };
-                    let Some(t2) = ent_ref2.get::<Transform>() else {
+                    let Ok(t2) = ent_ref2.get::<Transform>() else {
                         continue;
                     };
                     let ent2_bounds = t2.bounds();
@@ -101,42 +101,50 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
                 if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
                     let res = {
                         let [ent1, ent2] = w.many([ent1, ent2]);
-                        let Some(phy1) = ent1.get::<Physics>() else {
+                        let Ok(phy1) = ent1.get::<Physics>() else {
                             continue;
                         };
-                        let Some(phy2) = ent2.get::<Physics>() else {
+                        let Ok(phy2) = ent2.get::<Physics>() else {
                             continue;
                         };
 
                         !(phy1.check_against & phy2.group).is_empty()
                     };
                     if res {
-                        if let Some(hook) = get_ent_hooks(w, ent1) {
-                            hook.touch(eng, w, ent1, ent2);
+                        if let Ok(hook) = get_ent_hooks(w, ent1) {
+                            if let Err(err) = hook.touch(eng, w, ent1, ent2) {
+                                log::error!(
+                                    "Error occuerd on handling touch hook of {ent1:?} {ent2:?}: {err}"
+                                );
+                            }
                         }
                     }
                     let res = {
                         let [ent1, ent2] = w.many([ent1, ent2]);
-                        let Some(phy1) = ent1.get::<Physics>() else {
+                        let Ok(phy1) = ent1.get::<Physics>() else {
                             continue;
                         };
-                        let Some(phy2) = ent2.get::<Physics>() else {
+                        let Ok(phy2) = ent2.get::<Physics>() else {
                             continue;
                         };
                         !(phy1.group & phy2.check_against).is_empty()
                     };
                     if res {
-                        if let Some(hook) = get_ent_hooks(w, ent2) {
-                            hook.touch(eng, w, ent2, ent1);
+                        if let Ok(hook) = get_ent_hooks(w, ent2) {
+                            if let Err(err) = hook.touch(eng, w, ent2, ent1) {
+                                log::error!(
+                                    "Error occuerd on handling touch hook of {ent1:?} {ent2:?}: {err}"
+                                );
+                            }
                         }
                     }
 
                     let res = {
                         let [ent1, ent2] = w.many([ent1, ent2]);
-                        let Some(phy1) = ent1.get::<Physics>() else {
+                        let Ok(phy1) = ent1.get::<Physics>() else {
                             continue;
                         };
-                        let Some(phy2) = ent2.get::<Physics>() else {
+                        let Ok(phy2) = ent2.get::<Physics>() else {
                             continue;
                         };
                         phy1.physics.bits() >= EntCollidesMode::LITE.bits()
@@ -159,10 +167,10 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
 pub(crate) fn resolve_collision(eng: &mut Engine, w: &mut World, a: Ent, b: Ent, overlap: Vec2) {
     let [mut a, mut b] = w.many_mut([a, b]);
 
-    let Some(phy_a) = a.get_mut::<Physics>() else {
+    let Ok(phy_a) = a.get_mut::<Physics>() else {
         return;
     };
-    let Some(phy_b) = b.get_mut::<Physics>() else {
+    let Ok(phy_b) = b.get_mut::<Physics>() else {
         return;
     };
 
@@ -302,14 +310,14 @@ pub(crate) fn entities_separate_on_y_axis(
 }
 
 pub(crate) fn handle_trace_result(eng: &mut Engine, ent: &mut EntMut, t: Trace) {
-    if let Some(transform) = ent.get_mut::<Transform>() {
+    if let Ok(transform) = ent.get_mut::<Transform>() {
         transform.pos = t.pos;
     }
 
     if !t.is_collide {
         return;
     }
-    if let Some(phy) = ent.get_mut::<Physics>() {
+    if let Ok(phy) = ent.get_mut::<Physics>() {
         phy.vel = Vec2::ZERO;
     }
 
@@ -318,7 +326,7 @@ pub(crate) fn handle_trace_result(eng: &mut Engine, ent: &mut EntMut, t: Trace) 
     // If this entity is bouncy, calculate the velocity against the
     // slope's normal (the dot product) and see if we want to bounce
     // back.
-    let Some(phy) = ent.get_mut::<Physics>() else {
+    let Ok(phy) = ent.get_mut::<Physics>() else {
         return;
     };
     if phy.restitution > 0. {
@@ -415,8 +423,8 @@ pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
 
 pub(crate) fn calc_ent_overlap(w: &mut World, ent1: Ent, ent2: Ent) -> Option<Vec2> {
     let [ent1, ent2] = w.many([ent1, ent2]);
-    let t1 = ent1.get::<Transform>()?;
-    let t2 = ent2.get::<Transform>()?;
+    let t1 = ent1.get::<Transform>().ok()?;
+    let t2 = ent2.get::<Transform>().ok()?;
     calc_overlap(
         &Shape {
             pos: t1.pos,

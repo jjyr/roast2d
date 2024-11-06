@@ -1,5 +1,6 @@
 use std::any::Any;
 
+use anyhow::Result;
 use glam::Vec2;
 
 use crate::{
@@ -14,8 +15,6 @@ use crate::{
 /// EntHooks
 ///
 /// Use EntHooks to customize entity callback behaviors.
-/// The return value has no meaning, but return Option<()> allows us to use question-mark operator
-/// to return from empty queries.
 pub trait EntHooks {
     /// Load entity settings
     fn settings(
@@ -24,22 +23,22 @@ pub trait EntHooks {
         _w: &mut World,
         _ent: Ent,
         _settings: serde_json::Value,
-    ) -> Option<()> {
-        None
+    ) -> Result<()> {
+        Ok(())
     }
 
     /// Update callback is called before the entity_base_update
-    fn update(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) -> Option<()> {
-        None
+    fn update(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) -> Result<()> {
+        Ok(())
     }
 
     /// Post update callback is called after the entity_base_update
-    fn post_update(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) -> Option<()> {
-        None
+    fn post_update(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) -> Result<()> {
+        Ok(())
     }
 
     // Draw entity anim
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Option<()> {
+    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
         let sprite = ent.get::<Sprite>()?;
         let transform = ent.get::<Transform>()?;
@@ -49,17 +48,17 @@ pub trait EntHooks {
             Some(transform.scale),
             Some(transform.angle),
         );
-        None
+        Ok(())
     }
 
     /// Called when entity is removed through kill
-    fn kill(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) -> Option<()> {
-        None
+    fn kill(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent) -> Result<()> {
+        Ok(())
     }
 
     /// Called if one entity is touched by another entity
-    fn touch(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent, _other: Ent) -> Option<()> {
-        None
+    fn touch(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent, _other: Ent) -> Result<()> {
+        Ok(())
     }
 
     /// Called when two entity are collide
@@ -70,8 +69,8 @@ pub trait EntHooks {
         _ent: Ent,
         _normal: Vec2,
         _trace: Option<&Trace>,
-    ) -> Option<()> {
-        None
+    ) -> Result<()> {
+        Ok(())
     }
 
     /// Called when entity get damage
@@ -82,19 +81,19 @@ pub trait EntHooks {
         ent: Ent,
         _other: Ent,
         damage: f32,
-    ) -> Option<()> {
+    ) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let health = ent.get_mut::<Health>()?;
         health.health -= damage;
         if health.health < 0.0 && health.alive {
             eng.kill(ent.id());
         }
-        None
+        Ok(())
     }
 
     /// Called when entity is triggerred by another entity
-    fn trigger(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent, _other: Ent) -> Option<()> {
-        None
+    fn trigger(&self, _eng: &mut Engine, _w: &mut World, _ent: Ent, _other: Ent) -> Result<()> {
+        Ok(())
     }
 
     /// Called when entity recives a message
@@ -104,7 +103,7 @@ pub trait EntHooks {
         _w: &mut World,
         _ent: Ent,
         _data: Box<dyn Any>,
-    ) -> Option<()> {
-        None
+    ) -> Result<()> {
+        Ok(())
     }
 }

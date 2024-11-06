@@ -8,6 +8,7 @@ pub mod commands;
 pub mod ecs;
 pub mod engine;
 pub mod entity_hooks;
+pub mod errors;
 pub mod font;
 pub mod handle;
 pub mod health;

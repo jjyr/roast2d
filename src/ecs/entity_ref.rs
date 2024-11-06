@@ -1,5 +1,7 @@
 use std::any::type_name;
 
+use crate::errors::Error;
+
 use super::{
     component::{Component, ComponentId},
     entity::Ent,
@@ -22,12 +24,14 @@ impl<'w> EntRef<'w> {
         self.ent
     }
 
-    pub fn get<T: Component + 'static>(&'w self) -> Option<&'w T> {
+    pub fn get<T: Component + 'static>(&'w self) -> Result<&'w T, Error> {
         let w = unsafe { self.world_ref.as_ref() };
         w.storage
-            .get(&ComponentId::of::<T>())?
+            .get(&ComponentId::of::<T>())
+            .ok_or(Error::NoComponent)?
             .get(&self.ent)
             .and_then(|b| b.as_any().downcast_ref())
+            .ok_or(Error::NoComponent)
     }
 }
 
@@ -71,19 +75,23 @@ impl<'w> EntMut<'w> {
         Some(self)
     }
 
-    pub fn get<T: Component + 'static>(&self) -> Option<&T> {
+    pub fn get<T: Component + 'static>(&self) -> Result<&T, Error> {
         let w = unsafe { self.world_ref.as_ref() };
         w.storage
-            .get(&ComponentId::of::<T>())?
+            .get(&ComponentId::of::<T>())
+            .ok_or(Error::NoComponent)?
             .get(&self.ent)
             .and_then(|b| b.as_any().downcast_ref())
+            .ok_or(Error::NoComponent)
     }
 
-    pub fn get_mut<T: Component + 'static>(&mut self) -> Option<&mut T> {
+    pub fn get_mut<T: Component + 'static>(&mut self) -> Result<&mut T, Error> {
         let w = unsafe { self.world_ref.as_mut() };
         w.storage
-            .get_mut(&ComponentId::of::<T>())?
+            .get_mut(&ComponentId::of::<T>())
+            .ok_or(Error::NoComponent)?
             .get_mut(&self.ent)
             .and_then(|b| b.as_any_mut().downcast_mut())
+            .ok_or(Error::NoComponent)
     }
 }

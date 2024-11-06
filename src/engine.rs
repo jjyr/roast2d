@@ -477,14 +477,16 @@ impl Engine {
         let mut ents: Vec<_> = w
             .iter_ents_ref()
             .filter_map(|ent_ref| {
-                let transform = ent_ref.get::<Transform>()?;
+                let transform = ent_ref.get::<Transform>().ok()?;
                 Some((ent_ref.id(), transform.z_index))
             })
             .collect();
         ents.sort_by_key(|(_ent, z)| *z);
         for (ent, _z) in ents {
-            if let Some(hooks) = get_ent_hooks(w, ent) {
-                hooks.draw(self, w, ent, viewport);
+            if let Ok(hooks) = get_ent_hooks(w, ent) {
+                if let Err(err) = hooks.draw(self, w, ent, viewport) {
+                    log::error!("Error occured when call draw hooks on {ent:?}: {err}");
+                }
             }
         }
     }
@@ -495,13 +497,17 @@ impl Engine {
         let ents_count = ents.len();
         for ent in ents {
             let ent_hooks = get_ent_hooks(w, ent);
-            if let Some(hooks) = ent_hooks.as_ref() {
-                hooks.update(self, w, ent);
+            if let Ok(hooks) = ent_hooks.as_ref() {
+                if let Err(err) = hooks.update(self, w, ent) {
+                    log::error!("Error when update {ent:?}: {err:?}");
+                }
             }
             // physics update
             physics::entity_base_update(self, w, ent);
-            if let Some(hooks) = ent_hooks {
-                hooks.post_update(self, w, ent);
+            if let Ok(hooks) = ent_hooks {
+                if let Err(err) = hooks.post_update(self, w, ent) {
+                    log::error!("Error when update {ent:?}: {err:?}");
+                }
             }
         }
 
@@ -553,10 +559,12 @@ impl Engine {
         }
 
         // handle_commands
-        self.handle_commands(w);
+        if let Err(err) = self.handle_commands(w) {
+            log::error!("Error occured when handling commands {err:?}");
+        }
 
         // Update camera
-        let camera_follow = self.camera.follow.and_then(|ent_ref| w.get(ent_ref));
+        let camera_follow = self.camera.follow.and_then(|ent_ref| w.get(ent_ref).ok());
         let bounds = self.collision_map.as_ref().map(|map| map.bounds());
         self.camera.update(
             self.tick,
@@ -598,14 +606,14 @@ impl Engine {
                     });
                 }
                 FetchedTask::CreateFont { handle, font } => {
-                    let Some(cache) = world.get_resource_mut::<TextCache>() else {
+                    let Ok(cache) = world.get_resource_mut::<TextCache>() else {
                         log::error!("Failed to get text cache");
                         continue;
                     };
                     cache.add_font(handle.id(), font);
                 }
                 FetchedTask::RemoveFont { handle } => {
-                    let Some(cache) = world.get_resource_mut::<TextCache>() else {
+                    let Ok(cache) = world.get_resource_mut::<TextCache>() else {
                         log::error!("Failed to get text cache");
                         continue;
                     };
@@ -753,29 +761,24 @@ impl Engine {
     }
 
     /// Handle commands
-    fn handle_commands(&mut self, w: &mut World) {
+    fn handle_commands(&mut self, w: &mut World) -> anyhow::Result<()> {
         let commands = self.commands.take();
         for command in commands {
             match command {
                 Command::Collide { ent, normal, trace } => {
-                    if let Some(hooks) = get_ent_hooks(w, ent) {
-                        hooks.collide(self, w, ent, normal, trace.as_ref());
-                    }
+                    let hooks = get_ent_hooks(w, ent)?;
+                    hooks.collide(self, w, ent, normal, trace.as_ref())?;
                 }
                 Command::Setting { ent, settings } => {
-                    if let Some(hooks) = get_ent_hooks(w, ent) {
-                        hooks.settings(self, w, ent, settings);
-                    }
+                    let hooks = get_ent_hooks(w, ent)?;
+                    hooks.settings(self, w, ent, settings)?;
                 }
                 Command::KillEnt { ent } => {
-                    if let Some(mut ent) = w.get_mut(ent) {
-                        if let Some(health) = ent.get_mut::<Health>() {
-                            health.alive = false;
-                        }
-                    }
-                    if let Some(hooks) = get_ent_hooks(w, ent) {
-                        hooks.kill(self, w, ent);
-                    }
+                    let mut ent_ref = w.get_mut(ent)?;
+                    let health = ent_ref.get_mut::<Health>()?;
+                    health.alive = false;
+                    let hooks = get_ent_hooks(w, ent)?;
+                    hooks.kill(self, w, ent)?;
                     w.despawn(ent);
                 }
                 Command::Damage {
@@ -783,21 +786,19 @@ impl Engine {
                     by_ent,
                     damage,
                 } => {
-                    if let Some(hooks) = get_ent_hooks(w, ent) {
-                        hooks.damage(self, w, ent, by_ent, damage);
-                    }
+                    let hooks = get_ent_hooks(w, ent)?;
+                    hooks.damage(self, w, ent, by_ent, damage)?;
                 }
                 Command::Trigger { ent, other } => {
-                    if let Some(hooks) = get_ent_hooks(w, ent) {
-                        hooks.trigger(self, w, ent, other);
-                    }
+                    let hooks = get_ent_hooks(w, ent)?;
+                    hooks.trigger(self, w, ent, other)?;
                 }
                 Command::Message { ent, data } => {
-                    if let Some(hooks) = get_ent_hooks(w, ent) {
-                        hooks.message(self, w, ent, data);
-                    }
+                    let hooks = get_ent_hooks(w, ent)?;
+                    hooks.message(self, w, ent, data)?;
                 }
             }
         }
+        Ok(())
     }
 }

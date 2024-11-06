@@ -4,6 +4,7 @@ use roast2d_derive::Component;
 
 use crate::{
     entity_hooks::EntHooks,
+    errors::Error,
     prelude::{Ent, World},
 };
 
@@ -23,7 +24,7 @@ impl Hooks {
     }
 }
 
-pub(crate) fn get_ent_hooks(w: &mut World, ent: Ent) -> Option<Rc<dyn EntHooks>> {
+pub(crate) fn get_ent_hooks(w: &mut World, ent: Ent) -> Result<Rc<dyn EntHooks>, Error> {
     w.get(ent)
         .and_then(|ent_ref| ent_ref.get::<Hooks>().map(|h| h.get()))
 }

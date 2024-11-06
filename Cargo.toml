@@ -29,6 +29,7 @@ serde = { version = "1.0.207", features = ["derive"] }
 serde_json = "1.0.124"
 roast2d_derive = { version = "0", path = "roast2d_derive" }
 hashbrown = "0.15.0"
+thiserror = "2.0.0"
 
 
 # Non-Wasm32 target

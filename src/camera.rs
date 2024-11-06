@@ -73,7 +73,7 @@ impl Camera {
         bounds: Option<Vec2>,
     ) {
         if let Some(follow) = follow {
-            let Some(transform) = follow.get::<Transform>() else {
+            let Ok(transform) = follow.get::<Transform>() else {
                 log::warn!("Camera follow an non transform ent");
                 return;
             };
@@ -103,7 +103,7 @@ impl Camera {
                 self.look_ahead_target.y = self.look_ahead.y;
             }
 
-            if self.snap_to_platform && follow.get::<Physics>().is_some_and(|phy| phy.on_ground) {
+            if self.snap_to_platform && follow.get::<Physics>().is_ok_and(|phy| phy.on_ground) {
                 self.deadzone_pos.y = follow_rect.max.y - self.deadzone.y;
             }
 
