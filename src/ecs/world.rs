@@ -186,31 +186,44 @@ impl World {
     }
 
     /// Iterate component
-    pub fn iter_by<T: Component + 'static>(&self) -> Option<impl Iterator<Item = &Ent>> {
+    pub fn iter_by<T: Component + 'static>(&self) -> Result<impl Iterator<Item = &Ent>, Error> {
         let component_id = ComponentId::of::<T>();
-        self.storage.get(&component_id).map(|v| v.keys())
+        self.storage
+            .get(&component_id)
+            .map(|v| v.keys())
+            .ok_or(Error::NoComponent)
     }
 
     /// Iterate component
-    pub fn iter_ref_by<T: Component + 'static>(&self) -> Option<impl Iterator<Item = EntRef>> {
+    pub fn iter_ref_by<T: Component + 'static>(
+        &self,
+    ) -> Result<impl Iterator<Item = EntRef>, Error> {
         let component_id = ComponentId::of::<T>();
-        self.storage.get(&component_id).map(|v| {
-            v.keys().map(|ent| {
-                let world_ref = UnsafeWorldRef::new_readonly(self);
-                EntRef::new(*ent, world_ref)
+        self.storage
+            .get(&component_id)
+            .map(|v| {
+                v.keys().map(|ent| {
+                    let world_ref = UnsafeWorldRef::new_readonly(self);
+                    EntRef::new(*ent, world_ref)
+                })
             })
-        })
+            .ok_or(Error::NoComponent)
     }
 
     /// Iterate component
-    pub fn iter_mut_by<T: Component + 'static>(&mut self) -> Option<impl Iterator<Item = EntMut>> {
+    pub fn iter_mut_by<T: Component + 'static>(
+        &mut self,
+    ) -> Result<impl Iterator<Item = EntMut>, Error> {
         let component_id = ComponentId::of::<T>();
-        self.storage.get(&component_id).map(|v| {
-            v.keys().map(|ent| {
-                let world_ref = UnsafeWorldRef::new_readonly(self);
-                EntMut::new(*ent, world_ref)
+        self.storage
+            .get(&component_id)
+            .map(|v| {
+                v.keys().map(|ent| {
+                    let world_ref = UnsafeWorldRef::new_readonly(self);
+                    EntMut::new(*ent, world_ref)
+                })
             })
-        })
+            .ok_or(Error::NoComponent)
     }
 
     /// Spawn a new entity
