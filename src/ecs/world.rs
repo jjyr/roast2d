@@ -36,12 +36,14 @@ impl World {
             .split("::")
             .last()
             .expect("can't get name of component");
+        // insert component name
         self.component_by_name
             .insert(name.to_string(), component_id.clone());
-        let _ = self
-            .new_component_funcs
-            .insert(component_id, Box::new(|| Box::new(T::default())))
-            .expect("init duplicate component");
+        // init function
+        self.new_component_funcs
+            .insert(component_id.clone(), Box::new(|| Box::new(T::default())));
+        // init storage
+        let _ = self.storage.try_insert(component_id, Default::default());
     }
 
     pub fn get_component_id_by_name(&self, name: &str) -> Option<ComponentId> {
@@ -186,18 +188,16 @@ impl World {
     }
 
     /// Iterate component
-    pub fn iter_by<T: Component + 'static>(&self) -> Result<impl Iterator<Item = &Ent>, Error> {
+    pub fn iter_by<T: Component + 'static>(&self) -> impl Iterator<Item = &Ent> {
         let component_id = ComponentId::of::<T>();
         self.storage
             .get(&component_id)
             .map(|v| v.keys())
-            .ok_or(Error::NoComponent)
+            .expect("No component, make sure init_component first")
     }
 
     /// Iterate component
-    pub fn iter_ref_by<T: Component + 'static>(
-        &self,
-    ) -> Result<impl Iterator<Item = EntRef>, Error> {
+    pub fn iter_ref_by<T: Component + 'static>(&self) -> impl Iterator<Item = EntRef> {
         let component_id = ComponentId::of::<T>();
         self.storage
             .get(&component_id)
@@ -207,13 +207,11 @@ impl World {
                     EntRef::new(*ent, world_ref)
                 })
             })
-            .ok_or(Error::NoComponent)
+            .expect("No component, make sure init_component first")
     }
 
     /// Iterate component
-    pub fn iter_mut_by<T: Component + 'static>(
-        &mut self,
-    ) -> Result<impl Iterator<Item = EntMut>, Error> {
+    pub fn iter_mut_by<T: Component + 'static>(&mut self) -> impl Iterator<Item = EntMut> {
         let component_id = ComponentId::of::<T>();
         self.storage
             .get(&component_id)
@@ -223,7 +221,7 @@ impl World {
                     EntMut::new(*ent, world_ref)
                 })
             })
-            .ok_or(Error::NoComponent)
+            .expect("No component, make sure init_component first")
     }
 
     /// Spawn a new entity
