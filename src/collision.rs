@@ -47,11 +47,11 @@ impl CollisionSet {
     }
 }
 
-pub(crate) fn init_collision(_eng: &mut Engine, w: &mut World) {
+pub(crate) fn init_collision(_g: &mut Engine, w: &mut World) {
     w.add_resource(CollisionSet::default());
 }
 
-pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
+pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
     let Some(mut collision_set) = w.remove_resource::<CollisionSet>() else {
         return;
     };
@@ -59,11 +59,11 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
     // Sort by x or y position
     // insertion sort can gain better performance since list is sorted in every frames
 
-    let sweep_axis = eng.sweep_axis;
+    let sweep_axis = g.sweep_axis;
     collision_set.sort_entities_for_sweep(w, sweep_axis);
 
     // Sweep touches
-    eng.perf.checks = 0;
+    g.perf.checks = 0;
     let ents_count = collision_set.ents.len();
     for i in 0..ents_count {
         let ent1 = collision_set.ents[i];
@@ -97,7 +97,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
                 if sweep_axis.get(ent2_bounds.min) > max_pos {
                     break;
                 }
-                eng.perf.checks += 1;
+                g.perf.checks += 1;
                 if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
                     let res = {
                         let [ent1, ent2] = w.many([ent1, ent2]);
@@ -112,7 +112,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
                     };
                     if res {
                         if let Ok(hook) = get_ent_hooks(w, ent1) {
-                            if let Err(err) = hook.touch(eng, w, ent1, ent2) {
+                            if let Err(err) = hook.touch(g, w, ent1, ent2) {
                                 log::error!(
                                     "Error occuerd on handling touch hook of {ent1:?} {ent2:?}: {err}"
                                 );
@@ -131,7 +131,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
                     };
                     if res {
                         if let Ok(hook) = get_ent_hooks(w, ent2) {
-                            if let Err(err) = hook.touch(eng, w, ent2, ent1) {
+                            if let Err(err) = hook.touch(g, w, ent2, ent1) {
                                 log::error!(
                                     "Error occuerd on handling touch hook of {ent1:?} {ent2:?}: {err}"
                                 );
@@ -154,7 +154,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
                             && (phy1.mass + phy2.mass) > 0.0
                     };
                     if res {
-                        resolve_collision(eng, w, ent1, ent2, overlap);
+                        resolve_collision(g, w, ent1, ent2, overlap);
                     }
                 }
             }
@@ -164,7 +164,7 @@ pub(crate) fn update_collision(eng: &mut Engine, w: &mut World) {
 }
 
 /// Resolve entity collision
-pub(crate) fn resolve_collision(eng: &mut Engine, w: &mut World, a: Ent, b: Ent, overlap: Vec2) {
+pub(crate) fn resolve_collision(g: &mut Engine, w: &mut World, a: Ent, b: Ent, overlap: Vec2) {
     let [mut a, mut b] = w.many_mut([a, b]);
 
     let Ok(phy_a) = a.get_mut::<Physics>() else {
@@ -199,43 +199,27 @@ pub(crate) fn resolve_collision(eng: &mut Engine, w: &mut World, a: Ent, b: Ent,
 
     if overlap_y.abs() > overlap_x.abs() {
         if overlap_x > 0.0 {
-            entities_separate_on_x_axis(eng, &mut a, &mut b, a_move, b_move, overlap_x.abs());
-            eng.collide(a.id(), Vec2::new(-1.0, 0.0), None);
-            eng.collide(b.id(), Vec2::new(1.0, 0.0), None);
+            entities_separate_on_x_axis(g, &mut a, &mut b, a_move, b_move, overlap_x.abs());
+            g.collide(a.id(), Vec2::new(-1.0, 0.0), None);
+            g.collide(b.id(), Vec2::new(1.0, 0.0), None);
         } else if overlap_x < 0.0 {
-            entities_separate_on_x_axis(eng, &mut b, &mut a, b_move, a_move, overlap_x.abs());
-            eng.collide(a.id(), Vec2::new(1.0, 0.0), None);
-            eng.collide(b.id(), Vec2::new(-1.0, 0.0), None);
+            entities_separate_on_x_axis(g, &mut b, &mut a, b_move, a_move, overlap_x.abs());
+            g.collide(a.id(), Vec2::new(1.0, 0.0), None);
+            g.collide(b.id(), Vec2::new(-1.0, 0.0), None);
         }
     } else if overlap_y > 0.0 {
-        entities_separate_on_y_axis(
-            eng,
-            &mut a,
-            &mut b,
-            a_move,
-            b_move,
-            overlap_y.abs(),
-            eng.tick,
-        );
-        eng.collide(a.id(), Vec2::new(0.0, -1.0), None);
-        eng.collide(b.id(), Vec2::new(0.0, 1.0), None);
+        entities_separate_on_y_axis(g, &mut a, &mut b, a_move, b_move, overlap_y.abs(), g.tick);
+        g.collide(a.id(), Vec2::new(0.0, -1.0), None);
+        g.collide(b.id(), Vec2::new(0.0, 1.0), None);
     } else if overlap_y < 0.0 {
-        entities_separate_on_y_axis(
-            eng,
-            &mut b,
-            &mut a,
-            b_move,
-            a_move,
-            overlap_y.abs(),
-            eng.tick,
-        );
-        eng.collide(a.id(), Vec2::new(0.0, 1.0), None);
-        eng.collide(b.id(), Vec2::new(0.0, -1.0), None);
+        entities_separate_on_y_axis(g, &mut b, &mut a, b_move, a_move, overlap_y.abs(), g.tick);
+        g.collide(a.id(), Vec2::new(0.0, 1.0), None);
+        g.collide(b.id(), Vec2::new(0.0, -1.0), None);
     }
 }
 
 pub(crate) fn entities_separate_on_x_axis(
-    eng: &mut Engine,
+    g: &mut Engine,
     ent_left: &mut EntMut,
     ent_right: &mut EntMut,
     left_move: f32,
@@ -252,7 +236,7 @@ pub(crate) fn entities_separate_on_x_axis(
             left.vel.x -= bounce;
         }
 
-        entity_move(eng, ent_left, Vec2::new(-overlap * left_move, 0.0));
+        entity_move(g, ent_left, Vec2::new(-overlap * left_move, 0.0));
     }
 
     if right_move > 0.0 {
@@ -263,12 +247,12 @@ pub(crate) fn entities_separate_on_x_axis(
         if bounce > ENTITY_MIN_BOUNCE_VELOCITY {
             right.vel.x += bounce;
         }
-        entity_move(eng, ent_right, Vec2::new(overlap * right_move, 0.0));
+        entity_move(g, ent_right, Vec2::new(overlap * right_move, 0.0));
     }
 }
 
 pub(crate) fn entities_separate_on_y_axis(
-    eng: &mut Engine,
+    g: &mut Engine,
     ent_top: &mut EntMut,
     ent_bottom: &mut EntMut,
     mut top_move: f32,
@@ -296,7 +280,7 @@ pub(crate) fn entities_separate_on_y_axis(
             top.on_ground = true;
             move_x = bottom.vel.x * ticks;
         }
-        entity_move(eng, ent_top, Vec2::new(move_x, -overlap * top_move));
+        entity_move(g, ent_top, Vec2::new(move_x, -overlap * top_move));
     }
 
     if bottom_move > 0.0 {
@@ -305,11 +289,11 @@ pub(crate) fn entities_separate_on_y_axis(
         if bounce > ENTITY_MIN_BOUNCE_VELOCITY {
             bottom.vel.y += bounce;
         }
-        entity_move(eng, ent_bottom, Vec2::new(0.0, overlap * bottom_move));
+        entity_move(g, ent_bottom, Vec2::new(0.0, overlap * bottom_move));
     }
 }
 
-pub(crate) fn handle_trace_result(eng: &mut Engine, ent: &mut EntMut, t: Trace) {
+pub(crate) fn handle_trace_result(g: &mut Engine, ent: &mut EntMut, t: Trace) {
     if let Ok(transform) = ent.get_mut::<Transform>() {
         transform.pos = t.pos;
     }
@@ -321,7 +305,7 @@ pub(crate) fn handle_trace_result(eng: &mut Engine, ent: &mut EntMut, t: Trace) 
         phy.vel = Vec2::ZERO;
     }
 
-    eng.collide(ent.id(), t.normal, Some(t.clone()));
+    g.collide(ent.id(), t.normal, Some(t.clone()));
 
     // If this entity is bouncy, calculate the velocity against the
     // slope's normal (the dot product) and see if we want to bounce

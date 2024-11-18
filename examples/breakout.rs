@@ -70,10 +70,10 @@ impl Ball {
 }
 
 impl EntHooks for Ball {
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
+    fn draw(&self, g: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
         let transform = ent.get::<Transform>()?;
-        eng.draw_rect(
+        g.draw_rect(
             self.size,
             transform.pos + viewport,
             self.color,
@@ -86,7 +86,7 @@ impl EntHooks for Ball {
 
     fn collide(
         &self,
-        _eng: &mut Engine,
+        _g: &mut Engine,
         w: &mut World,
         ent: Ent,
         normal: Vec2,
@@ -106,9 +106,9 @@ impl EntHooks for Ball {
         Ok(())
     }
 
-    fn post_update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
+    fn post_update(&self, g: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
-        let view = eng.view_size();
+        let view = g.view_size();
         let t = ent.get::<Transform>()?;
         let half_size = t.size * 0.5;
         let bounds = t.bounds();
@@ -192,15 +192,15 @@ impl Brick {
 pub struct BrickHooks;
 
 impl EntHooks for BrickHooks {
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
+    fn draw(&self, g: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
         let t = ent.get::<Transform>()?;
         let color = ent.get::<Brick>()?.color;
-        eng.draw_rect(t.size, t.pos + viewport, color, None, Some(t.scale), None);
+        g.draw_rect(t.size, t.pos + viewport, color, None, Some(t.scale), None);
         Ok(())
     }
 
-    fn kill(&self, _eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
+    fn kill(&self, _g: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         G.with_borrow_mut(|g| {
             g.score += 1;
         });
@@ -209,14 +209,14 @@ impl EntHooks for BrickHooks {
         Ok(())
     }
 
-    fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
+    fn update(&self, g: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         if ent.get::<Brick>()?.hit {
             let ent_id = ent.id();
             let brick = ent.get_mut::<Brick>()?;
-            brick.dying += eng.tick;
+            brick.dying += g.tick;
             if brick.dying > BRICK_DYING {
-                eng.kill(ent_id);
+                g.kill(ent_id);
             }
 
             let progress = (brick.dying / BRICK_DYING).powi(2);
@@ -240,7 +240,7 @@ impl EntHooks for BrickHooks {
         Ok(())
     }
 
-    fn touch(&self, _eng: &mut Engine, w: &mut World, ent: Ent, _other: Ent) -> Result<()> {
+    fn touch(&self, _g: &mut Engine, w: &mut World, ent: Ent, _other: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let brick = ent.get_mut::<Brick>()?;
         if !brick.hit {
@@ -282,19 +282,19 @@ impl Player {
 pub struct PlayerHooks;
 
 impl EntHooks for PlayerHooks {
-    fn draw(&self, eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
+    fn draw(&self, g: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) -> Result<()> {
         let ent = w.get(ent)?;
         let t = ent.get::<Transform>()?;
         let p = ent.get::<Player>()?;
-        eng.draw_rect(t.size, t.pos + viewport, p.color, None, Some(t.scale), None);
+        g.draw_rect(t.size, t.pos + viewport, p.color, None, Some(t.scale), None);
         Ok(())
     }
 
-    fn update(&self, eng: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
+    fn update(&self, g: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let phy = ent.get_mut::<Physics>()?;
 
-        let input = eng.input();
+        let input = g.input();
 
         phy.accel = Vec2::default();
         if input.pressed(Action::Right) {
@@ -306,7 +306,7 @@ impl EntHooks for PlayerHooks {
         Ok(())
     }
 
-    fn touch(&self, _eng: &mut Engine, w: &mut World, ent: Ent, other: Ent) -> Result<()> {
+    fn touch(&self, _g: &mut Engine, w: &mut World, ent: Ent, other: Ent) -> Result<()> {
         let [mut ent, mut other] = w.many_mut([ent, other]);
         if other.get::<Ball>().is_ok() {
             let p1 = ent.get_mut::<Physics>()?;
@@ -337,11 +337,11 @@ impl Default for Demo {
 }
 
 impl Scene for Demo {
-    fn init(&mut self, eng: &mut Engine, w: &mut World) {
-        let view = eng.view_size();
+    fn init(&mut self, g: &mut Engine, w: &mut World) {
+        let view = g.view_size();
 
         // bind keys
-        let input = eng.input_mut();
+        let input = g.input_mut();
         input.bind(KeyCode::Left, Action::Left);
         input.bind(KeyCode::Right, Action::Right);
         input.bind(KeyCode::KeyA, Action::Left);
@@ -351,12 +351,12 @@ impl Scene for Demo {
         Ball::init(w, Vec2::new(40.0, view.y - 64.0));
 
         // walls
-        let v_size = Vec2::new(WALL_THICK, eng.view_size().y);
-        let h_size = Vec2::new(eng.view_size().x, WALL_THICK);
+        let v_size = Vec2::new(WALL_THICK, g.view_size().y);
+        let h_size = Vec2::new(g.view_size().x, WALL_THICK);
         let l_pos = Vec2::new(-WALL_THICK * 0.5, view.y * 0.5);
         let r_pos = Vec2::new(view.x + WALL_THICK * 0.5, view.y * 0.5);
         let t_pos = Vec2::new(view.x * 0.5, -WALL_THICK * 0.5);
-        let b_pos = Vec2::new(eng.view_size().x * 0.5, view.y + WALL_THICK * 0.5);
+        let b_pos = Vec2::new(g.view_size().x * 0.5, view.y + WALL_THICK * 0.5);
         Wall::init(w, l_pos, v_size);
         Wall::init(w, r_pos, v_size);
         Wall::init(w, t_pos, h_size);
@@ -383,10 +383,10 @@ impl Scene for Demo {
         log::info!("Init Demo");
     }
 
-    fn update(&mut self, eng: &mut Engine, w: &mut World) {
-        eng.scene_base_update(w);
+    fn update(&mut self, g: &mut Engine, w: &mut World) {
+        g.update_world(w);
         self.frames += 1.0;
-        self.timer += eng.tick;
+        self.timer += g.tick;
         if self.timer > self.interval {
             self.fps = self.frames / self.timer;
             self.timer = 0.;
@@ -394,36 +394,36 @@ impl Scene for Demo {
         }
     }
 
-    fn draw(&mut self, eng: &mut Engine, w: &mut World) {
-        eng.scene_base_draw(w);
+    fn draw(&mut self, g: &mut Engine, w: &mut World) {
+        g.draw_world(w);
         // Score
         let score = G.with_borrow(|g| g.score);
-        eng.draw_text(
+        g.draw_text(
             Text::new(format!("Score: {}", score), 20.0, WHITE),
             Vec2::new(0.0, 0.0),
             Vec2::ZERO,
             None,
         );
         // FPS
-        eng.draw_text(
+        g.draw_text(
             Text::new(format!("FPS: {:.2}", self.fps), 20.0, WHITE),
-            Vec2::new(eng.view_size().x - 160.0, 0.0),
+            Vec2::new(g.view_size().x - 160.0, 0.0),
             Vec2::ZERO,
             None,
         );
     }
 }
 
-fn setup(eng: &mut Engine, _w: &mut World) {
+fn setup(g: &mut Engine, _w: &mut World) {
     // set resize and scale
-    eng.set_view_size(Vec2::new(800.0, 600.0));
-    eng.set_scale_mode(ScaleMode::Exact);
-    eng.set_resize_mode(ResizeMode {
+    g.set_view_size(Vec2::new(800.0, 600.0));
+    g.set_scale_mode(ScaleMode::Exact);
+    g.set_resize_mode(ResizeMode {
         width: true,
         height: true,
     });
-    eng.set_sweep_axis(SweepAxis::Y);
-    eng.set_scene(Demo::default());
+    g.set_sweep_axis(SweepAxis::Y);
+    g.set_scene(Demo::default());
 }
 
 async fn run() {

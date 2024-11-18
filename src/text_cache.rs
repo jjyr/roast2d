@@ -55,6 +55,6 @@ impl TextCache {
     }
 }
 
-pub(crate) fn init_text_cache(_eng: &mut Engine, w: &mut World) {
+pub(crate) fn init_text_cache(_g: &mut Engine, w: &mut World) {
     w.add_resource(TextCache::default());
 }

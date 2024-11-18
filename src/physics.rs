@@ -108,7 +108,7 @@ impl Default for Physics {
 }
 
 /// Entity base update, handle physics velocities
-pub(crate) fn entity_base_update(eng: &mut Engine, w: &mut World, ent: Ent) {
+pub(crate) fn entity_base_update(g: &mut Engine, w: &mut World, ent: Ent) {
     let Ok(mut ent) = w.get_mut(ent) else {
         return;
     };
@@ -120,25 +120,25 @@ pub(crate) fn entity_base_update(eng: &mut Engine, w: &mut World, ent: Ent) {
     }
     // Integrate velocity
     let vel = phy.vel;
-    phy.vel.y += eng.gravity * phy.gravity * eng.tick;
+    phy.vel.y += g.gravity * phy.gravity * g.tick;
     let fric = Vec2::new(
-        (phy.friction.x * eng.tick).min(1.0),
-        (phy.friction.y * eng.tick).min(1.0),
+        (phy.friction.x * g.tick).min(1.0),
+        (phy.friction.y * g.tick).min(1.0),
     );
-    phy.vel = phy.vel + (phy.accel * eng.tick - phy.vel * fric);
-    let vstep = (vel + phy.vel) * (eng.tick * 0.5);
+    phy.vel = phy.vel + (phy.accel * g.tick - phy.vel * fric);
+    let vstep = (vel + phy.vel) * (g.tick * 0.5);
     phy.on_ground = false;
-    entity_move(eng, &mut ent, vstep);
+    entity_move(g, &mut ent, vstep);
 }
 
 // Move entity
-pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
+pub fn entity_move(g: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
     if ent
         .get::<Physics>()
         .is_ok_and(|phy| phy.physics.contains(EntPhysics::WORLD))
-        && eng.collision_map.is_some()
+        && g.collision_map.is_some()
     {
-        let map = eng.collision_map.as_ref().unwrap();
+        let map = g.collision_map.as_ref().unwrap();
         let Ok(transform) = ent.get::<Transform>() else {
             return;
         };
@@ -149,7 +149,7 @@ pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
             transform.scaled_size(),
             transform.angle,
         );
-        handle_trace_result(eng, ent, t.clone());
+        handle_trace_result(g, ent, t.clone());
         // The previous trace was stopped short and we still have some velocity
         // left? Do a second trace with the new velocity. this allows us
         // to slide along tiles;
@@ -160,7 +160,7 @@ pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
             if vel_along_normal != 0. {
                 let remaining = 1. - t.length;
                 let vstep2 = rotated_normal * (vel_along_normal * remaining);
-                let map = eng.collision_map.as_ref().unwrap();
+                let map = g.collision_map.as_ref().unwrap();
                 let Ok(transform) = ent.get::<Transform>() else {
                     return;
                 };
@@ -171,7 +171,7 @@ pub fn entity_move(eng: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
                     transform.scaled_size(),
                     transform.angle,
                 );
-                handle_trace_result(eng, ent, t2);
+                handle_trace_result(g, ent, t2);
             }
         }
     } else if let Ok(transform) = ent.get_mut::<Transform>() {

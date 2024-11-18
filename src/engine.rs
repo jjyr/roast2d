@@ -41,13 +41,13 @@ const ENGINE_MAX_TICK: f32 = 100.0;
 const DEFAULT_FONT_BYTES: &[u8; 59164] = include_bytes!("../assets/Pixel Square 10.ttf");
 
 /// get default texture
-fn default_texture(eng: &mut Engine) -> Handle {
+fn default_texture(g: &mut Engine) -> Handle {
     DEFAULT_TEXTURE
         .get_or_init(|| {
-            let handle = eng.assets.alloc_handle();
+            let handle = g.assets.alloc_handle();
             let data = vec![255, 255, 255, 255];
             let size = UVec2::splat(1);
-            eng.with_platform(|p| {
+            g.with_platform(|p| {
                 p.create_texture(handle.clone(), data, size);
             });
             handle
@@ -58,20 +58,20 @@ fn default_texture(eng: &mut Engine) -> Handle {
 // Scene trait
 pub trait Scene {
     // Init the scene, use it to load assets and setup entities.
-    fn init(&mut self, _eng: &mut Engine, _w: &mut World) {}
+    fn init(&mut self, _g: &mut Engine, _w: &mut World) {}
 
     // Update scene per frame, you probably want to call scene_base_update if you override this function.
-    fn update(&mut self, eng: &mut Engine, w: &mut World) {
-        eng.scene_base_update(w);
+    fn update(&mut self, g: &mut Engine, w: &mut World) {
+        g.update_world(w);
     }
 
     // Draw scene per frame, use it to draw entities or Hud, you probably want to call scene_base_draw if you override this function.
-    fn draw(&mut self, eng: &mut Engine, w: &mut World) {
-        eng.scene_base_draw(w);
+    fn draw(&mut self, g: &mut Engine, w: &mut World) {
+        g.draw_world(w);
     }
 
     // Called when cleanup scene, release assets and resources.
-    fn cleanup(&mut self, _eng: &mut Engine, _w: &mut World) {}
+    fn cleanup(&mut self, _g: &mut Engine, _w: &mut World) {}
 }
 
 #[derive(Default)]
@@ -195,8 +195,8 @@ impl Engine {
     /// ```
     /// # use roast2d::prelude::*;
     /// // draw a text with left-top anchor (0, 0)
-    /// # fn draw(eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
-    ///    eng.draw_text(
+    /// # fn draw(g: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    ///    g.draw_text(
     ///        Text::new(format!("Hello"), 20.0, BLUE),
     ///        Vec2::new(0.0, 20.0),
     ///        Vec2::ZERO,
@@ -257,8 +257,8 @@ impl Engine {
     /// ```
     /// # use roast2d::prelude::*;
     /// // draw a blue rectangle
-    /// # fn draw(eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
-    ///   eng.draw_rect(
+    /// # fn draw(g: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    ///   g.draw_rect(
     ///       Vec2::splat(40.0),
     ///       Vec2::new(50.0, 100.0) + viewport,
     ///       BLUE,
@@ -302,10 +302,10 @@ impl Engine {
     /// ```
     /// # use roast2d::prelude::*;
     /// // draw entity's sprite
-    /// # fn draw(eng: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
+    /// # fn draw(g: &mut Engine, w: &mut World, ent: Ent, viewport: Vec2) {
     ///   let ent_ref = w.get(ent).unwrap();
     ///   let sprite = ent_ref.get::<Sprite>().unwrap();
-    ///   eng.draw_image(
+    ///   g.draw_image(
     ///       &sprite,
     ///       Vec2::new(50.0, 100.0) + viewport,
     ///       None,
@@ -443,8 +443,8 @@ impl Engine {
         self.render.borrow_mut().resize(size);
     }
 
-    /// Scene base draw, draw maps and entities
-    pub fn scene_base_draw(&mut self, w: &mut World) {
+    /// Draw maps and entities in the world
+    pub fn draw_world(&mut self, w: &mut World) {
         let viewport = self.viewport();
         let mut render = self.render.borrow_mut();
 
@@ -467,8 +467,8 @@ impl Engine {
         }
     }
 
-    /// Scene base update, update entities
-    pub fn scene_base_update(&mut self, w: &mut World) {
+    /// Update entities in the world
+    pub fn update_world(&mut self, w: &mut World) {
         self.entities_update(w);
     }
 
@@ -555,7 +555,7 @@ impl Engine {
             scene.update(self, w);
             self.scene = Some(scene);
         } else {
-            self.scene_base_update(w);
+            self.update_world(w);
         }
 
         // handle_commands
@@ -579,7 +579,7 @@ impl Engine {
             scene.draw(self, w);
             self.scene = Some(scene);
         } else {
-            self.scene_base_draw(w);
+            self.draw_world(w);
         }
 
         self.perf.draw = (self.now() - time_real_now) - self.perf.update;
