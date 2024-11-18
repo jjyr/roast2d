@@ -559,9 +559,7 @@ impl Engine {
         }
 
         // handle_commands
-        if let Err(err) = self.handle_commands(w) {
-            log::error!("Error occured when handling commands {err:?}");
-        }
+        self.handle_commands(w);
 
         // Update camera
         let camera_follow = self.camera.follow.and_then(|ent_ref| w.get(ent_ref).ok());
@@ -761,42 +759,49 @@ impl Engine {
     }
 
     /// Handle commands
-    fn handle_commands(&mut self, w: &mut World) -> anyhow::Result<()> {
+    fn handle_commands(&mut self, w: &mut World) {
         let commands = self.commands.take();
         for command in commands {
-            match command {
-                Command::Collide { ent, normal, trace } => {
-                    let hooks = get_ent_hooks(w, ent)?;
-                    hooks.collide(self, w, ent, normal, trace.as_ref())?;
-                }
-                Command::Setting { ent, settings } => {
-                    let hooks = get_ent_hooks(w, ent)?;
-                    hooks.settings(self, w, ent, settings)?;
-                }
-                Command::KillEnt { ent } => {
-                    let mut ent_ref = w.get_mut(ent)?;
-                    let health = ent_ref.get_mut::<Health>()?;
-                    health.alive = false;
-                    let hooks = get_ent_hooks(w, ent)?;
-                    hooks.kill(self, w, ent)?;
-                    w.despawn(ent);
-                }
-                Command::Damage {
-                    ent,
-                    by_ent,
-                    damage,
-                } => {
-                    let hooks = get_ent_hooks(w, ent)?;
-                    hooks.damage(self, w, ent, by_ent, damage)?;
-                }
-                Command::Trigger { ent, other } => {
-                    let hooks = get_ent_hooks(w, ent)?;
-                    hooks.trigger(self, w, ent, other)?;
-                }
-                Command::Message { ent, data } => {
-                    let hooks = get_ent_hooks(w, ent)?;
-                    hooks.message(self, w, ent, data)?;
-                }
+            if let Err(err) = self.handle_command(w, command) {
+                log::debug!("Error occured when handling commands {err:?}");
+            }
+        }
+    }
+
+    /// Handle command
+    fn handle_command(&mut self, w: &mut World, command: Command) -> anyhow::Result<()> {
+        match command {
+            Command::Collide { ent, normal, trace } => {
+                let hooks = get_ent_hooks(w, ent)?;
+                hooks.collide(self, w, ent, normal, trace.as_ref())?;
+            }
+            Command::Setting { ent, settings } => {
+                let hooks = get_ent_hooks(w, ent)?;
+                hooks.settings(self, w, ent, settings)?;
+            }
+            Command::KillEnt { ent } => {
+                let mut ent_ref = w.get_mut(ent)?;
+                let health = ent_ref.get_mut::<Health>()?;
+                health.alive = false;
+                let hooks = get_ent_hooks(w, ent)?;
+                hooks.kill(self, w, ent)?;
+                w.despawn(ent);
+            }
+            Command::Damage {
+                ent,
+                by_ent,
+                damage,
+            } => {
+                let hooks = get_ent_hooks(w, ent)?;
+                hooks.damage(self, w, ent, by_ent, damage)?;
+            }
+            Command::Trigger { ent, other } => {
+                let hooks = get_ent_hooks(w, ent)?;
+                hooks.trigger(self, w, ent, other)?;
+            }
+            Command::Message { ent, data } => {
+                let hooks = get_ent_hooks(w, ent)?;
+                hooks.message(self, w, ent, data)?;
             }
         }
         Ok(())
