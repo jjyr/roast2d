@@ -64,6 +64,15 @@ impl<'w> EntMut<'w> {
         self
     }
 
+    pub fn remove<T: Component + 'static>(&mut self) -> &mut Self {
+        let w = unsafe { self.world_ref.as_mut() };
+        w.storage
+            .entry(ComponentId::of::<T>())
+            .or_default()
+            .remove(&self.ent);
+        self
+    }
+
     pub fn add_by_name(&mut self, name: &str) -> Option<&mut Self> {
         let w = unsafe { self.world_ref.as_mut() };
         let component_id = w.get_component_id_by_name(name)?;
