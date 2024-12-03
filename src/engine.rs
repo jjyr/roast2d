@@ -782,7 +782,7 @@ impl Engine {
             Command::KillEnt { ent } => {
                 let mut ent_ref = w.get_mut(ent)?;
                 let health = ent_ref.get_mut::<Health>()?;
-                health.alive = false;
+                health.killed = true;
                 let hooks = get_ent_hooks(w, ent)?;
                 hooks.kill(self, w, ent)?;
                 w.despawn(ent);

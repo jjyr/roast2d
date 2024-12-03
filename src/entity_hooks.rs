@@ -84,8 +84,8 @@ pub trait EntHooks {
     ) -> Result<()> {
         let mut ent = w.get_mut(ent)?;
         let health = ent.get_mut::<Health>()?;
-        health.health -= damage;
-        if health.health < 0.0 && health.alive {
+        health.value -= damage;
+        if !health.is_alive() && !health.killed {
             g.kill(ent.id());
         }
         Ok(())
