@@ -1,7 +1,11 @@
 extern crate roast2d;
 use std::cell::RefCell;
 
-use roast2d::{collision::CollisionSet, hooks::Hooks, prelude::*};
+use roast2d::{
+    collision::{init_collision, CollisionSet},
+    entities::{draw_world, init_commands, update_world, Commands, EntHooks, Hooks},
+    prelude::*,
+};
 use roast2d_derive::Component;
 
 const BALL_ACCEL: f32 = 100.0;
@@ -210,34 +214,36 @@ impl EntHooks for BrickHooks {
     }
 
     fn update(&self, g: &mut Engine, w: &mut World, ent: Ent) -> Result<()> {
-        let mut ent = w.get_mut(ent)?;
-        if ent.get::<Brick>()?.hit {
-            let ent_id = ent.id();
-            let brick = ent.get_mut::<Brick>()?;
-            brick.dying += g.tick;
-            if brick.dying > BRICK_DYING {
-                g.kill(ent_id);
-            }
+        w.with_resource::<Commands, Result<()>, _>(|w, commands| -> Result<()> {
+            let mut ent = w.get_mut(ent)?;
+            if ent.get::<Brick>()?.hit {
+                let ent_id = ent.id();
+                let brick = ent.get_mut::<Brick>()?;
+                brick.dying += g.tick;
+                if brick.dying > BRICK_DYING {
+                    commands.kill(ent_id);
+                }
 
-            let progress = (brick.dying / BRICK_DYING).powi(2);
-            let color = {
-                let (r1, g1, b1): (u8, u8, u8) = (0x5b, 0x6e, 0xe1);
-                let (r2, g2, b2) = (RED.r, RED.g, RED.b);
-                let r = r1.saturating_add(((r1 as f32 - r2 as f32) * progress).abs() as u8);
-                let g = g1.saturating_add(((g1 as f32 - g2 as f32) * progress).abs() as u8);
-                let b = b1.saturating_add(((b1 as f32 - b2 as f32) * progress).abs() as u8);
-                Color::rgb(r, g, b)
-            };
-            let scale = {
-                let start = 1.0;
-                let end = start * 0.5;
-                start - (start - end) * progress
-            };
-            brick.color = color;
-            let t = ent.get_mut::<Transform>()?;
-            t.scale = Vec2::splat(scale);
-        }
-        Ok(())
+                let progress = (brick.dying / BRICK_DYING).powi(2);
+                let color = {
+                    let (r1, g1, b1): (u8, u8, u8) = (0x5b, 0x6e, 0xe1);
+                    let (r2, g2, b2) = (RED.r, RED.g, RED.b);
+                    let r = r1.saturating_add(((r1 as f32 - r2 as f32) * progress).abs() as u8);
+                    let g = g1.saturating_add(((g1 as f32 - g2 as f32) * progress).abs() as u8);
+                    let b = b1.saturating_add(((b1 as f32 - b2 as f32) * progress).abs() as u8);
+                    Color::rgb(r, g, b)
+                };
+                let scale = {
+                    let start = 1.0;
+                    let end = start * 0.5;
+                    start - (start - end) * progress
+                };
+                brick.color = color;
+                let t = ent.get_mut::<Transform>()?;
+                t.scale = Vec2::splat(scale);
+            }
+            Ok(())
+        })
     }
 
     fn touch(&self, _g: &mut Engine, w: &mut World, ent: Ent, _other: Ent) -> Result<()> {
@@ -340,6 +346,10 @@ impl Scene for Demo {
     fn init(&mut self, g: &mut Engine, w: &mut World) {
         let view = g.view_size();
 
+        // enable sub modules
+        init_commands(g, w);
+        init_collision(g, w);
+
         // bind keys
         let input = g.input_mut();
         input.bind(KeyCode::Left, Action::Left);
@@ -384,7 +394,7 @@ impl Scene for Demo {
     }
 
     fn update(&mut self, g: &mut Engine, w: &mut World) {
-        g.update_world(w);
+        update_world(g, w);
         self.frames += 1.0;
         self.timer += g.tick;
         if self.timer > self.interval {
@@ -395,7 +405,7 @@ impl Scene for Demo {
     }
 
     fn draw(&mut self, g: &mut Engine, w: &mut World) {
-        g.draw_world(w);
+        draw_world(g, w);
         // Score
         let score = G.with_borrow(|g| g.score);
         g.draw_text(
@@ -412,6 +422,8 @@ impl Scene for Demo {
             None,
         );
     }
+
+    fn cleanup(&mut self, _g: &mut Engine, _w: &mut World) {}
 }
 
 fn setup(g: &mut Engine, _w: &mut World) {

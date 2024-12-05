@@ -1,35 +1,24 @@
 use std::{
-    any::Any,
     cell::{RefCell, UnsafeCell},
     path::Path,
     sync::OnceLock,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use glam::{UVec2, Vec2};
 
 use crate::{
     asset::{Asset, AssetManager, AssetType, FetchedTask},
     camera::Camera,
-    collision::{self, init_collision},
-    collision_map::{CollisionMap, COLLISION_MAP},
     color::Color,
-    commands::{Command, Commands},
-    ecs::{entity::Ent, entity_ref::EntMut, world::World},
+    ecs::world::World,
     font::{Font, Text},
     handle::Handle,
-    health::Health,
-    hooks::get_ent_hooks,
     input::InputState,
-    ldtk::{LayerType, LdtkProject},
-    map::{map_draw, Map},
-    physics::{self, entity_move},
     platform::Platform,
     render::{Render, ResizeMode, ScaleMode},
     sprite::Sprite,
     text_cache::{init_text_cache, TextCache},
-    trace::Trace,
-    transform::Transform,
     types::SweepAxis,
 };
 
@@ -58,20 +47,16 @@ fn default_texture(g: &mut Engine) -> Handle {
 // Scene trait
 pub trait Scene {
     // Init the scene, use it to load assets and setup entities.
-    fn init(&mut self, _g: &mut Engine, _w: &mut World) {}
+    fn init(&mut self, _g: &mut Engine, _w: &mut World);
 
     // Update scene per frame, you probably want to call scene_base_update if you override this function.
-    fn update(&mut self, g: &mut Engine, w: &mut World) {
-        g.update_world(w);
-    }
+    fn update(&mut self, g: &mut Engine, w: &mut World);
 
     // Draw scene per frame, use it to draw entities or Hud, you probably want to call scene_base_draw if you override this function.
-    fn draw(&mut self, g: &mut Engine, w: &mut World) {
-        g.draw_world(w);
-    }
+    fn draw(&mut self, g: &mut Engine, w: &mut World);
 
     // Called when cleanup scene, release assets and resources.
-    fn cleanup(&mut self, _g: &mut Engine, _w: &mut World) {}
+    fn cleanup(&mut self, _g: &mut Engine, _w: &mut World);
 }
 
 #[derive(Default)]
@@ -101,13 +86,8 @@ pub struct Engine {
     // The frame number in this current scene. Increases by 1 for every frame.
     pub frame: f32,
 
-    // The map to use for entity vs. world collisions. Reset for each scene.
-    // Use engine_set_collision_map() to set it.
-    pub collision_map: Option<CollisionMap>,
-
-    // The maps to draw. Reset for each scene. Use engine_add_background_map()
-    // to add.
-    background_maps: Vec<Map>,
+    // Camera bounds
+    pub bounds: Option<Vec2>,
 
     // A global multiplier that affects the gravity of all entities. This only
     // makes sense for side view games. For a top-down game you'd want to have
@@ -134,8 +114,6 @@ pub struct Engine {
     pub(crate) render: RefCell<Render>,
     // input
     pub(crate) input: InputState,
-    // commands
-    pub(crate) commands: Commands,
     // AssetsManager
     pub assets: AssetManager,
 }
@@ -148,8 +126,7 @@ impl Engine {
             time_scale: 1.0,
             tick: 0.0,
             frame: 0.0,
-            collision_map: None,
-            background_maps: Default::default(),
+            bounds: None,
             gravity: 0.0,
             camera: Camera::default(),
             perf: Perf::default(),
@@ -159,7 +136,6 @@ impl Engine {
             world: UnsafeCell::new(Default::default()),
             render: RefCell::new(Render::new(platform)),
             input: InputState::default(),
-            commands: Commands::default(),
             sweep_axis: SweepAxis::default(),
             assets: AssetManager::new("assets"),
         }
@@ -414,8 +390,6 @@ impl Engine {
     pub(crate) fn init<Setup: FnOnce(&mut Engine, &mut World)>(&mut self, setup: Setup) {
         let world = unsafe { self.borrow_world() };
         self.time_real = self.now();
-        // init submodules
-        init_collision(self, world);
         // init textcache
         init_text_cache(self, world);
         self.init_default_font(world);
@@ -443,79 +417,6 @@ impl Engine {
         self.render.borrow_mut().resize(size);
     }
 
-    /// Draw maps and entities in the world
-    pub fn draw_world(&mut self, w: &mut World) {
-        let viewport = self.viewport();
-        let mut render = self.render.borrow_mut();
-
-        // Background maps
-        for map in self.background_maps.iter().rev() {
-            if !map.foreground {
-                map_draw(&mut render, map, viewport);
-            }
-        }
-        drop(render);
-
-        self.entities_draw(w, viewport);
-
-        // Foreground maps
-        let mut render = self.render.borrow_mut();
-        for map in self.background_maps.iter().rev() {
-            if map.foreground {
-                map_draw(&mut render, map, viewport);
-            }
-        }
-    }
-
-    /// Update entities in the world
-    pub fn update_world(&mut self, w: &mut World) {
-        self.entities_update(w);
-    }
-
-    fn entities_draw(&mut self, w: &mut World, viewport: Vec2) {
-        // Sort entities by draw_order
-        let mut ents: Vec<_> = w
-            .iter_ents_ref()
-            .filter_map(|ent_ref| {
-                let transform = ent_ref.get::<Transform>().ok()?;
-                Some((ent_ref.id(), transform.z_index))
-            })
-            .collect();
-        ents.sort_by_key(|(_ent, z)| *z);
-        for (ent, _z) in ents {
-            if let Ok(hooks) = get_ent_hooks(w, ent) {
-                if let Err(err) = hooks.draw(self, w, ent, viewport) {
-                    log::error!("Error occured when call draw hooks on {ent:?}: {err}");
-                }
-            }
-        }
-    }
-
-    fn entities_update(&mut self, w: &mut World) {
-        // Update all entities
-        let ents: Vec<_> = w.iter_ents().cloned().collect();
-        let ents_count = ents.len();
-        for ent in ents {
-            let ent_hooks = get_ent_hooks(w, ent);
-            if let Ok(hooks) = ent_hooks.as_ref() {
-                if let Err(err) = hooks.update(self, w, ent) {
-                    log::error!("Error when update {ent:?}: {err:?}");
-                }
-            }
-            // physics update
-            physics::entity_base_update(self, w, ent);
-            if let Ok(hooks) = ent_hooks {
-                if let Err(err) = hooks.post_update(self, w, ent) {
-                    log::error!("Error when update {ent:?}: {err:?}");
-                }
-            }
-        }
-
-        collision::update_collision(self, w);
-
-        self.perf.entities = ents_count;
-    }
-
     /// Called per frame, the main update logic of engine
     pub(crate) fn update(&mut self) {
         let world = unsafe { self.borrow_world() };
@@ -531,8 +432,6 @@ impl Engine {
                 scene.cleanup(self, w);
             }
 
-            self.background_maps.clear();
-            self.collision_map = None;
             self.time = 0.;
             self.frame = 0.;
             self.camera.viewport = Vec2::new(0., 0.);
@@ -554,21 +453,15 @@ impl Engine {
         if let Some(mut scene) = self.scene.take() {
             scene.update(self, w);
             self.scene = Some(scene);
-        } else {
-            self.update_world(w);
         }
-
-        // handle_commands
-        self.handle_commands(w);
 
         // Update camera
         let camera_follow = self.camera.follow.and_then(|ent_ref| w.get(ent_ref).ok());
-        let bounds = self.collision_map.as_ref().map(|map| map.bounds());
         self.camera.update(
             self.tick,
             self.render.borrow().logical_size(),
             camera_follow,
-            bounds,
+            self.bounds,
         );
 
         self.perf.update = self.now() - time_real_now;
@@ -576,8 +469,6 @@ impl Engine {
         if let Some(mut scene) = self.scene.take() {
             scene.draw(self, w);
             self.scene = Some(scene);
-        } else {
-            self.draw_world(w);
         }
 
         self.perf.draw = (self.now() - time_real_now) - self.perf.update;
@@ -632,82 +523,9 @@ impl Engine {
         self.scene_next.replace(Box::new(scene));
     }
 
-    /// Load level
-    pub fn load_level(
-        &mut self,
-        w: &mut World,
-        proj: &LdtkProject,
-        identifier: &str,
-    ) -> Result<()> {
-        let level = proj.get_level(identifier)?;
-        self.background_maps.clear();
-        self.collision_map.take();
-        self.commands.take();
-        self.input.clear();
-
-        for (index, layer) in level.layer_instances.iter().enumerate() {
-            match layer.r#type {
-                LayerType::IntGrid if layer.identifier == COLLISION_MAP => {
-                    let map = CollisionMap::from_ldtk_layer(layer)?;
-                    self.collision_map.replace(map);
-                }
-                LayerType::AutoLayer | LayerType::Tiles => {
-                    let tileset = if let Some(rel_path) = layer.tileset_rel_path.as_ref() {
-                        self.assets.load_texture(rel_path)
-                    } else {
-                        bail!(
-                            "Layer {}-{} doesn't has tileset",
-                            level.identifier,
-                            &layer.identifier
-                        )
-                    };
-                    let map = Map::from_ldtk_layer(proj, level, index, layer, tileset)?;
-                    self.background_maps.push(map);
-                }
-                LayerType::Entities => {
-                    // spawn entities
-                    for ent_ins in &layer.entity_instances {
-                        let pos = Vec2::new(
-                            (ent_ins.px.0 + ent_ins.width / 2) as f32,
-                            (ent_ins.px.1 + ent_ins.height / 2) as f32,
-                        );
-                        let ent = {
-                            let identifier = &ent_ins.identifier;
-                            let mut ent = w.spawn();
-                            // add transform
-                            ent.add(Transform::new(
-                                pos,
-                                Vec2::new(ent_ins.width as f32, ent_ins.height as f32),
-                            ))
-                            // add same name component
-                            .add_by_name(identifier);
-                            ent.id()
-                        };
-                        let settings = ent_ins
-                            .field_instances
-                            .iter()
-                            .map(|f| (f.identifier.clone(), f.value.clone()))
-                            .collect();
-                        self.setting(ent, settings);
-                    }
-                }
-                _ => {
-                    log::error!("Ignore layer {} {:?}", layer.identifier, layer.r#type);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Add background map
-    pub fn add_background_map(&mut self, map: Map) {
-        self.background_maps.push(map);
-    }
-
     /// Set collision map
-    pub fn set_collision_map(&mut self, map: CollisionMap) {
-        self.collision_map.replace(map);
+    pub fn set_bounds(&mut self, bounds: Vec2) {
+        self.bounds.replace(bounds);
     }
 
     /// Wether the engine is running
@@ -718,92 +536,5 @@ impl Engine {
     #[allow(dead_code)]
     pub(crate) fn cleanup(&mut self) {
         // Do nothing
-    }
-
-    pub(crate) fn collide(&mut self, ent: Ent, normal: Vec2, trace: Option<Trace>) {
-        self.commands.add(Command::Collide { ent, normal, trace });
-    }
-
-    /// Setting an entity
-    pub fn setting(&mut self, ent: Ent, settings: serde_json::Value) {
-        self.commands.add(Command::Setting { ent, settings });
-    }
-
-    /// Kill an entity
-    pub fn kill(&mut self, ent: Ent) {
-        self.commands.add(Command::KillEnt { ent });
-    }
-
-    /// Damage an entity
-    pub fn damage(&mut self, ent: Ent, by_ent: Ent, damage: f32) {
-        self.commands.add(Command::Damage {
-            ent,
-            by_ent,
-            damage,
-        });
-    }
-
-    /// Trigger an entity
-    pub fn trigger(&mut self, ent: Ent, other: Ent) {
-        self.commands.add(Command::Trigger { ent, other });
-    }
-
-    /// Message an entity
-    pub fn message(&mut self, ent: Ent, data: Box<dyn Any>) {
-        self.commands.add(Command::Message { ent, data });
-    }
-
-    /// Move entity
-    pub fn move_ent(&mut self, ent: &mut EntMut, vstep: Vec2) {
-        entity_move(self, ent, vstep);
-    }
-
-    /// Handle commands
-    fn handle_commands(&mut self, w: &mut World) {
-        let commands = self.commands.take();
-        for command in commands {
-            if let Err(err) = self.handle_command(w, command) {
-                log::debug!("Error occured when handling commands {err:?}");
-            }
-        }
-    }
-
-    /// Handle command
-    fn handle_command(&mut self, w: &mut World, command: Command) -> anyhow::Result<()> {
-        match command {
-            Command::Collide { ent, normal, trace } => {
-                let hooks = get_ent_hooks(w, ent)?;
-                hooks.collide(self, w, ent, normal, trace.as_ref())?;
-            }
-            Command::Setting { ent, settings } => {
-                let hooks = get_ent_hooks(w, ent)?;
-                hooks.settings(self, w, ent, settings)?;
-            }
-            Command::KillEnt { ent } => {
-                let mut ent_ref = w.get_mut(ent)?;
-                let health = ent_ref.get_mut::<Health>()?;
-                health.killed = true;
-                let hooks = get_ent_hooks(w, ent)?;
-                hooks.kill(self, w, ent)?;
-                w.despawn(ent);
-            }
-            Command::Damage {
-                ent,
-                by_ent,
-                damage,
-            } => {
-                let hooks = get_ent_hooks(w, ent)?;
-                hooks.damage(self, w, ent, by_ent, damage)?;
-            }
-            Command::Trigger { ent, other } => {
-                let hooks = get_ent_hooks(w, ent)?;
-                hooks.trigger(self, w, ent, other)?;
-            }
-            Command::Message { ent, data } => {
-                let hooks = get_ent_hooks(w, ent)?;
-                hooks.message(self, w, ent, data)?;
-            }
-        }
-        Ok(())
     }
 }

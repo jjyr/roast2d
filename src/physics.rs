@@ -4,7 +4,8 @@ use roast2d_derive::Component;
 
 use crate::collision::handle_trace_result;
 use crate::ecs::entity_ref::EntMut;
-use crate::prelude::Ent;
+use crate::entities::Commands;
+use crate::prelude::{CollisionMap, Ent};
 use crate::trace::trace;
 use crate::{ecs::world::World, engine::Engine};
 
@@ -109,36 +110,44 @@ impl Default for Physics {
 
 /// Entity base update, handle physics velocities
 pub(crate) fn entity_base_update(g: &mut Engine, w: &mut World, ent: Ent) {
-    let Ok(mut ent) = w.get_mut(ent) else {
-        return;
-    };
-    let Ok(phy) = ent.get_mut::<Physics>() else {
-        return;
-    };
-    if !phy.physics.contains(EntPhysics::MOVE) {
-        return;
-    }
-    // Integrate velocity
-    let vel = phy.vel;
-    phy.vel.y += g.gravity * phy.gravity * g.tick;
-    let fric = Vec2::new(
-        (phy.friction.x * g.tick).min(1.0),
-        (phy.friction.y * g.tick).min(1.0),
-    );
-    phy.vel = phy.vel + (phy.accel * g.tick - phy.vel * fric);
-    let vstep = (vel + phy.vel) * (g.tick * 0.5);
-    phy.on_ground = false;
-    entity_move(g, &mut ent, vstep);
+    w.with_resource::<CollisionMap, _, _>(|w, map| {
+        w.with_resource::<Commands, _, _>(|w, commands| {
+            let Ok(mut ent) = w.get_mut(ent) else {
+                return;
+            };
+            let Ok(phy) = ent.get_mut::<Physics>() else {
+                return;
+            };
+            if !phy.physics.contains(EntPhysics::MOVE) {
+                return;
+            }
+            // Integrate velocity
+            let vel = phy.vel;
+            phy.vel.y += g.gravity * phy.gravity * g.tick;
+            let fric = Vec2::new(
+                (phy.friction.x * g.tick).min(1.0),
+                (phy.friction.y * g.tick).min(1.0),
+            );
+            phy.vel = phy.vel + (phy.accel * g.tick - phy.vel * fric);
+            let vstep = (vel + phy.vel) * (g.tick * 0.5);
+            phy.on_ground = false;
+            entity_move(g, map, commands, &mut ent, vstep);
+        });
+    });
 }
 
 // Move entity
-pub fn entity_move(g: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
+pub fn entity_move(
+    _g: &mut Engine,
+    map: &CollisionMap,
+    commands: &mut Commands,
+    ent: &mut EntMut,
+    vstep: Vec2,
+) {
     if ent
         .get::<Physics>()
         .is_ok_and(|phy| phy.physics.contains(EntPhysics::WORLD))
-        && g.collision_map.is_some()
     {
-        let map = g.collision_map.as_ref().unwrap();
         let Ok(transform) = ent.get::<Transform>() else {
             return;
         };
@@ -149,7 +158,7 @@ pub fn entity_move(g: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
             transform.scaled_size(),
             transform.angle,
         );
-        handle_trace_result(g, ent, t.clone());
+        handle_trace_result(commands, ent, t.clone());
         // The previous trace was stopped short and we still have some velocity
         // left? Do a second trace with the new velocity. this allows us
         // to slide along tiles;
@@ -160,7 +169,6 @@ pub fn entity_move(g: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
             if vel_along_normal != 0. {
                 let remaining = 1. - t.length;
                 let vstep2 = rotated_normal * (vel_along_normal * remaining);
-                let map = g.collision_map.as_ref().unwrap();
                 let Ok(transform) = ent.get::<Transform>() else {
                     return;
                 };
@@ -171,7 +179,7 @@ pub fn entity_move(g: &mut Engine, ent: &mut EntMut, vstep: Vec2) {
                     transform.scaled_size(),
                     transform.angle,
                 );
-                handle_trace_result(g, ent, t2);
+                handle_trace_result(commands, ent, t2);
             }
         }
     } else if let Ok(transform) = ent.get_mut::<Transform>() {

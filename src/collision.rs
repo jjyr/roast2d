@@ -8,9 +8,9 @@ const ENTITY_MIN_BOUNCE_VELOCITY: f32 = 10.0;
 use crate::{
     ecs::{entity::Ent, entity_ref::EntMut, world::World},
     engine::Engine,
-    hooks::get_ent_hooks,
+    entities::{get_ent_hooks, Commands},
     physics::{entity_move, EntCollidesMode, EntPhysics, Physics},
-    prelude::Transform,
+    prelude::{CollisionMap, Transform},
     sat::{calc_sat_overlap, SatRect},
     sorts::insertion_sort_by_key,
     trace::Trace,
@@ -47,8 +47,9 @@ impl CollisionSet {
     }
 }
 
-pub(crate) fn init_collision(_g: &mut Engine, w: &mut World) {
+pub fn init_collision(_g: &mut Engine, w: &mut World) {
     w.add_resource(CollisionSet::default());
+    w.add_resource(CollisionMap::default());
 }
 
 pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
@@ -165,61 +166,105 @@ pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
 
 /// Resolve entity collision
 pub(crate) fn resolve_collision(g: &mut Engine, w: &mut World, a: Ent, b: Ent, overlap: Vec2) {
-    let [mut a, mut b] = w.many_mut([a, b]);
+    w.with_resource::<CollisionMap, _, _>(|w, map| {
+        w.with_resource::<Commands, _, _>(|w, commands| {
+            let [mut a, mut b] = w.many_mut([a, b]);
 
-    let Ok(phy_a) = a.get_mut::<Physics>() else {
-        return;
-    };
-    let Ok(phy_b) = b.get_mut::<Physics>() else {
-        return;
-    };
+            let Ok(phy_a) = a.get_mut::<Physics>() else {
+                return;
+            };
+            let Ok(phy_b) = b.get_mut::<Physics>() else {
+                return;
+            };
 
-    let Vec2 {
-        x: overlap_x,
-        y: overlap_y,
-    } = overlap;
+            let Vec2 {
+                x: overlap_x,
+                y: overlap_y,
+            } = overlap;
 
-    let a_move;
-    let b_move;
-    if phy_a.physics.is_collide_mode(EntCollidesMode::LITE)
-        || phy_b.physics.is_collide_mode(EntCollidesMode::FIXED)
-    {
-        a_move = 1.0;
-        b_move = 0.0;
-    } else if phy_a.physics.is_collide_mode(EntCollidesMode::FIXED)
-        || phy_b.physics.is_collide_mode(EntCollidesMode::LITE)
-    {
-        a_move = 0.0;
-        b_move = 1.0;
-    } else {
-        let total_mass = phy_a.mass + phy_b.mass;
-        a_move = phy_b.mass / total_mass;
-        b_move = phy_a.mass / total_mass;
-    }
+            let a_move;
+            let b_move;
+            if phy_a.physics.is_collide_mode(EntCollidesMode::LITE)
+                || phy_b.physics.is_collide_mode(EntCollidesMode::FIXED)
+            {
+                a_move = 1.0;
+                b_move = 0.0;
+            } else if phy_a.physics.is_collide_mode(EntCollidesMode::FIXED)
+                || phy_b.physics.is_collide_mode(EntCollidesMode::LITE)
+            {
+                a_move = 0.0;
+                b_move = 1.0;
+            } else {
+                let total_mass = phy_a.mass + phy_b.mass;
+                a_move = phy_b.mass / total_mass;
+                b_move = phy_a.mass / total_mass;
+            }
 
-    if overlap_y.abs() > overlap_x.abs() {
-        if overlap_x > 0.0 {
-            entities_separate_on_x_axis(g, &mut a, &mut b, a_move, b_move, overlap_x.abs());
-            g.collide(a.id(), Vec2::new(-1.0, 0.0), None);
-            g.collide(b.id(), Vec2::new(1.0, 0.0), None);
-        } else if overlap_x < 0.0 {
-            entities_separate_on_x_axis(g, &mut b, &mut a, b_move, a_move, overlap_x.abs());
-            g.collide(a.id(), Vec2::new(1.0, 0.0), None);
-            g.collide(b.id(), Vec2::new(-1.0, 0.0), None);
-        }
-    } else if overlap_y > 0.0 {
-        entities_separate_on_y_axis(g, &mut a, &mut b, a_move, b_move, overlap_y.abs(), g.tick);
-        g.collide(a.id(), Vec2::new(0.0, -1.0), None);
-        g.collide(b.id(), Vec2::new(0.0, 1.0), None);
-    } else if overlap_y < 0.0 {
-        entities_separate_on_y_axis(g, &mut b, &mut a, b_move, a_move, overlap_y.abs(), g.tick);
-        g.collide(a.id(), Vec2::new(0.0, 1.0), None);
-        g.collide(b.id(), Vec2::new(0.0, -1.0), None);
-    }
+            if overlap_y.abs() > overlap_x.abs() {
+                if overlap_x > 0.0 {
+                    entities_separate_on_x_axis(
+                        g,
+                        map,
+                        commands,
+                        &mut a,
+                        &mut b,
+                        a_move,
+                        b_move,
+                        overlap_x.abs(),
+                    );
+                    commands.collide(a.id(), Vec2::new(-1.0, 0.0), None);
+                    commands.collide(b.id(), Vec2::new(1.0, 0.0), None);
+                } else if overlap_x < 0.0 {
+                    entities_separate_on_x_axis(
+                        g,
+                        map,
+                        commands,
+                        &mut b,
+                        &mut a,
+                        b_move,
+                        a_move,
+                        overlap_x.abs(),
+                    );
+                    commands.collide(a.id(), Vec2::new(1.0, 0.0), None);
+                    commands.collide(b.id(), Vec2::new(-1.0, 0.0), None);
+                }
+            } else if overlap_y > 0.0 {
+                entities_separate_on_y_axis(
+                    g,
+                    map,
+                    commands,
+                    &mut a,
+                    &mut b,
+                    a_move,
+                    b_move,
+                    overlap_y.abs(),
+                    g.tick,
+                );
+                commands.collide(a.id(), Vec2::new(0.0, -1.0), None);
+                commands.collide(b.id(), Vec2::new(0.0, 1.0), None);
+            } else if overlap_y < 0.0 {
+                entities_separate_on_y_axis(
+                    g,
+                    map,
+                    commands,
+                    &mut b,
+                    &mut a,
+                    b_move,
+                    a_move,
+                    overlap_y.abs(),
+                    g.tick,
+                );
+                commands.collide(a.id(), Vec2::new(0.0, 1.0), None);
+                commands.collide(b.id(), Vec2::new(0.0, -1.0), None);
+            }
+        });
+    });
 }
 
 pub(crate) fn entities_separate_on_x_axis(
     g: &mut Engine,
+    map: &CollisionMap,
+    commands: &mut Commands,
     ent_left: &mut EntMut,
     ent_right: &mut EntMut,
     left_move: f32,
@@ -236,7 +281,13 @@ pub(crate) fn entities_separate_on_x_axis(
             left.vel.x -= bounce;
         }
 
-        entity_move(g, ent_left, Vec2::new(-overlap * left_move, 0.0));
+        entity_move(
+            g,
+            map,
+            commands,
+            ent_left,
+            Vec2::new(-overlap * left_move, 0.0),
+        );
     }
 
     if right_move > 0.0 {
@@ -247,12 +298,20 @@ pub(crate) fn entities_separate_on_x_axis(
         if bounce > ENTITY_MIN_BOUNCE_VELOCITY {
             right.vel.x += bounce;
         }
-        entity_move(g, ent_right, Vec2::new(overlap * right_move, 0.0));
+        entity_move(
+            g,
+            map,
+            commands,
+            ent_right,
+            Vec2::new(overlap * right_move, 0.0),
+        );
     }
 }
 
 pub(crate) fn entities_separate_on_y_axis(
     g: &mut Engine,
+    map: &CollisionMap,
+    commands: &mut Commands,
     ent_top: &mut EntMut,
     ent_bottom: &mut EntMut,
     mut top_move: f32,
@@ -280,7 +339,13 @@ pub(crate) fn entities_separate_on_y_axis(
             top.on_ground = true;
             move_x = bottom.vel.x * ticks;
         }
-        entity_move(g, ent_top, Vec2::new(move_x, -overlap * top_move));
+        entity_move(
+            g,
+            map,
+            commands,
+            ent_top,
+            Vec2::new(move_x, -overlap * top_move),
+        );
     }
 
     if bottom_move > 0.0 {
@@ -289,11 +354,17 @@ pub(crate) fn entities_separate_on_y_axis(
         if bounce > ENTITY_MIN_BOUNCE_VELOCITY {
             bottom.vel.y += bounce;
         }
-        entity_move(g, ent_bottom, Vec2::new(0.0, overlap * bottom_move));
+        entity_move(
+            g,
+            map,
+            commands,
+            ent_bottom,
+            Vec2::new(0.0, overlap * bottom_move),
+        );
     }
 }
 
-pub(crate) fn handle_trace_result(g: &mut Engine, ent: &mut EntMut, t: Trace) {
+pub(crate) fn handle_trace_result(commands: &mut Commands, ent: &mut EntMut, t: Trace) {
     if let Ok(transform) = ent.get_mut::<Transform>() {
         transform.pos = t.pos;
     }
@@ -305,7 +376,7 @@ pub(crate) fn handle_trace_result(g: &mut Engine, ent: &mut EntMut, t: Trace) {
         phy.vel = Vec2::ZERO;
     }
 
-    g.collide(ent.id(), t.normal, Some(t.clone()));
+    commands.collide(ent.id(), t.normal, Some(t.clone()));
 
     // If this entity is bouncy, calculate the velocity against the
     // slope's normal (the dot product) and see if we want to bounce

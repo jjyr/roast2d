@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use anyhow::{bail, Result};
 use glam::{IVec2, UVec2, Vec2};
+use roast2d_derive::Resource;
 
 use crate::ldtk::{LayerType, LdtkLevelLayerInstance};
 
@@ -21,6 +22,7 @@ impl CollisionRule for DefaultCollisionRule {
 }
 
 /// Game map
+#[derive(Resource)]
 pub struct CollisionMap {
     pub name: String,
     pub size: UVec2,
