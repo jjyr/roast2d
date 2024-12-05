@@ -129,8 +129,9 @@ fn handle_command(g: &mut Engine, w: &mut World, command: Command) -> anyhow::Re
         }
         Command::KillEnt { ent } => {
             let mut ent_ref = w.get_mut(ent)?;
-            let health = ent_ref.get_mut::<Health>()?;
-            health.killed = true;
+            if let Ok(health) = ent_ref.get_mut::<Health>() {
+                health.killed = true;
+            }
             let hooks = get_ent_hooks(w, ent)?;
             hooks.kill(g, w, ent)?;
             w.despawn(ent);
