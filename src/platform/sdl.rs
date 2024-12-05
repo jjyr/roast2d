@@ -123,6 +123,7 @@ impl Platform for SDLPlatform {
             )
         };
         texture.set_color_mod(color.r, color.g, color.b);
+        texture.set_alpha_mod(color.a);
 
         self.screen_buffer
             .canvas
