@@ -1,0 +1,12 @@
+[package]
+name = "roast2d_physics"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+roast2d = { path = "..", version = "0.0" }
+bitflags = "2.6.0"
+serde_json = "1.0"
+
+[dev-dependencies]
+rand = "0.8.5"

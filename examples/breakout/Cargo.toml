@@ -1,0 +1,11 @@
+[package]
+name = "example-breakout"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+roast2d = { path = "../.." }
+roast2d_physics = { path = "../../roast2d_physics/" }
+env_logger = "0.11"
+pollster = { version = "0.4.0", features = ["macro"] }
+rand = "0.8.5"

@@ -2,7 +2,6 @@ use glam::Vec2;
 
 use crate::{
     ecs::{entity::Ent, entity_ref::EntRef},
-    physics::Physics,
     transform::Transform,
     types::Rect,
 };
@@ -19,6 +18,9 @@ pub struct Camera {
     // Whether to automatically move the bottom of the deadzone up to the
     // target entity when the target is on_ground
     pub snap_to_platform: bool,
+
+    // Whether the followed ent is on the ground
+    pub is_followed_ent_on_ground: bool,
 
     // The minimum velocity (in pixels per second) for a camera movement. If
     // this is set too low and the camera is close to the target it will move
@@ -103,7 +105,7 @@ impl Camera {
                 self.look_ahead_target.y = self.look_ahead.y;
             }
 
-            if self.snap_to_platform && follow.get::<Physics>().is_ok_and(|phy| phy.on_ground) {
+            if self.snap_to_platform && self.is_followed_ent_on_ground {
                 self.deadzone_pos.y = follow_rect.max.y - self.deadzone.y;
             }
 

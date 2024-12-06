@@ -1,8 +1,10 @@
+use roast2d::prelude::*;
+
 use glam::{IVec2, Vec2};
 
 use crate::{
     collision::{calc_overlap, Shape},
-    prelude::CollisionMap,
+    collision_map::CollisionMap,
 };
 
 #[derive(Debug, Clone)]

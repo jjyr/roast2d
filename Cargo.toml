@@ -1,11 +1,21 @@
 [package]
 authors = ["jjy"]
-description = "Roast2D is a homebrew 2D game engine inspired by high_impact"
+description = "Roast2D is a homebrew 2D game engine"
 edition = "2021"
 license = "MIT"
 name = "roast2d"
 repository = "https://github.com/jjyr/roast2d"
 version = "0.0.10"
+
+[workspace]
+exclude = ["benches", "examples"]
+members = [
+  "examples/*",
+  "roast2d_derive",
+  "roast2d_physics",
+  "roast2d_ldtk",
+  "examples/breakout",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -20,13 +30,10 @@ web-debug = ["console_error_panic_hook"]
 
 [dependencies]
 anyhow = "1.0"
-bitflags = "2.6.0"
 glam = "0.29.2"
 image = { version = "0.25", default-features = false, features = ["png"] }
 log = "0.4.22"
 rusttype = "0.9.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 roast2d_derive = { version = "0", path = "roast2d_derive" }
 hashbrown = "0.15"
 thiserror = "2.0"
@@ -66,9 +73,6 @@ too_many_arguments = "allow"
 
 [dev-dependencies]
 criterion = "0.5.1"
-env_logger = "0.11"
-pollster = { version = "0.4.0", features = ["macro"] }
-rand = "0.8.5"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 getrandom = { version = "0.2", features = ["js"] }

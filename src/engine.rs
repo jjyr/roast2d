@@ -19,7 +19,6 @@ use crate::{
     render::{Render, ResizeMode, ScaleMode},
     sprite::Sprite,
     text_cache::{init_text_cache, TextCache},
-    types::SweepAxis,
 };
 
 /// Default texture
@@ -60,7 +59,7 @@ pub trait Scene {
 }
 
 #[derive(Default)]
-pub(crate) struct Perf {
+pub struct Perf {
     pub entities: usize,
     pub checks: usize,
     // draw_calls: usize,
@@ -94,13 +93,11 @@ pub struct Engine {
     // it at 0.0. Default: 1.0
     pub gravity: f32,
 
-    // Sweep axis
-    // The axis (x or y) on which we want to do the broad phase collision detection
-    // sweep & prune. For mosly horizontal games it should be x, for vertical ones y
-    pub(crate) sweep_axis: SweepAxis,
-
     // Various infos about the last frame
-    pub(crate) perf: Perf,
+    pub perf: Perf,
+
+    // input
+    pub input: InputState,
 
     // states
     is_running: bool,
@@ -112,8 +109,6 @@ pub struct Engine {
     pub(crate) camera: Camera,
     // render
     pub(crate) render: RefCell<Render>,
-    // input
-    pub(crate) input: InputState,
     // AssetsManager
     pub assets: AssetManager,
 }
@@ -136,7 +131,6 @@ impl Engine {
             world: UnsafeCell::new(Default::default()),
             render: RefCell::new(Render::new(platform)),
             input: InputState::default(),
-            sweep_axis: SweepAxis::default(),
             assets: AssetManager::new("assets"),
         }
     }
@@ -316,16 +310,6 @@ impl Engine {
         self.render.borrow_mut().draw_tile(
             image, tile, tile_size, dst_pos, scale, angle, flip_x, flip_y,
         );
-    }
-
-    /// Sweep axis
-    pub fn sweep_axis(&self) -> SweepAxis {
-        self.sweep_axis
-    }
-
-    /// Set sweep axis
-    pub fn set_sweep_axis(&mut self, sweep_axis: SweepAxis) {
-        self.sweep_axis = sweep_axis
     }
 
     /// View size

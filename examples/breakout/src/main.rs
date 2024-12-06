@@ -1,12 +1,12 @@
-extern crate roast2d;
 use std::cell::RefCell;
 
-use roast2d::{
-    collision::{init_collision, CollisionSet},
-    entities::{draw_world, init_commands, update_world, Commands, EntHooks, Hooks},
-    prelude::*,
+use roast2d::{derive::Component, prelude::*};
+use roast2d_physics::{
+    collision::{init_collision, CollisionSet, SweepAxis},
+    entities::{draw_entities, init_commands, update_entities, Commands, EntHooks, Hooks},
+    physics::{EntGroup, EntPhysics, Physics},
+    trace::Trace,
 };
-use roast2d_derive::Component;
 
 const BALL_ACCEL: f32 = 100.0;
 const BALL_MIN_VEL: f32 = 180.0;
@@ -348,7 +348,7 @@ impl Scene for Demo {
 
         // enable sub modules
         init_commands(g, w);
-        init_collision(g, w);
+        init_collision(g, w, SweepAxis::Y);
 
         // bind keys
         let input = g.input_mut();
@@ -394,7 +394,7 @@ impl Scene for Demo {
     }
 
     fn update(&mut self, g: &mut Engine, w: &mut World) {
-        update_world(g, w);
+        update_entities(g, w);
         self.frames += 1.0;
         self.timer += g.tick;
         if self.timer > self.interval {
@@ -405,7 +405,7 @@ impl Scene for Demo {
     }
 
     fn draw(&mut self, g: &mut Engine, w: &mut World) {
-        draw_world(g, w);
+        draw_entities(g, w);
         // Score
         let score = G.with_borrow(|g| g.score);
         g.draw_text(
@@ -434,7 +434,6 @@ fn setup(g: &mut Engine, _w: &mut World) {
         width: true,
         height: true,
     });
-    g.set_sweep_axis(SweepAxis::Y);
     g.set_scene(Demo::default());
 }
 

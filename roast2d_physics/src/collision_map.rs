@@ -1,12 +1,9 @@
+use roast2d::{derive::Resource, prelude::*};
 use std::fmt::Debug;
 
-use anyhow::{bail, Result};
 use glam::{IVec2, UVec2, Vec2};
-use roast2d_derive::Resource;
 
-use crate::ldtk::{LayerType, LdtkLevelLayerInstance};
-
-pub(crate) const COLLISION_MAP: &str = "Collision";
+pub const COLLISION_MAP: &str = "Collision";
 
 pub trait CollisionRule {
     fn is_collide(&self, map: &CollisionMap, pos: IVec2) -> bool;
@@ -76,25 +73,5 @@ impl CollisionMap {
             self.tile_size * self.size.x as f32,
             self.tile_size * self.size.y as f32,
         )
-    }
-
-    pub(crate) fn from_ldtk_layer(layer: &LdtkLevelLayerInstance) -> Result<Self> {
-        if layer.r#type != LayerType::IntGrid {
-            bail!("Collision map must be IntGrid type");
-        }
-        let size = UVec2::new(layer.c_wid, layer.c_hei);
-        let tile_size = layer.grid_size as f32;
-        let name = layer.identifier.clone();
-        let data = layer.int_grid_csv.clone();
-
-        let map = Self {
-            name,
-            size,
-            tile_size,
-            data,
-            collision_rule: Box::new(DefaultCollisionRule),
-        };
-        log::debug!("Set Collision map {:?}", &map);
-        Ok(map)
     }
 }

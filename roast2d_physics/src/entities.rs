@@ -1,55 +1,19 @@
 use std::rc::Rc;
 
-use roast2d_derive::{Component, Resource};
-
-use crate::{
-    collision,
-    engine::Engine,
-    errors::Error,
-    health::Health,
-    level::BackgroundMaps,
-    map::map_draw,
-    physics,
-    prelude::{Ent, World},
-    sprite::Sprite,
-    trace::Trace,
-    transform::Transform,
+use roast2d::{
+    derive::{Component, Resource},
+    prelude::*,
 };
+
+use crate::{collision, physics, trace::Trace};
 use std::any::Any;
 
 use anyhow::Result;
 use glam::Vec2;
 use serde_json::Value;
 
-/// Draw maps and entities in the world
-pub fn draw_world(g: &mut Engine, w: &mut World) {
+pub fn draw_entities(g: &mut Engine, w: &mut World) {
     let viewport = g.viewport();
-    let mut render = g.render.borrow_mut();
-
-    // Background maps
-    if let Ok(background_maps) = w.get_resource::<BackgroundMaps>() {
-        for map in background_maps.maps.iter().rev() {
-            if !map.foreground {
-                map_draw(&mut render, map, viewport);
-            }
-        }
-    }
-    drop(render);
-
-    entities_draw(g, w, viewport);
-
-    // Foreground maps
-    let mut render = g.render.borrow_mut();
-    if let Ok(background_maps) = w.get_resource::<BackgroundMaps>() {
-        for map in background_maps.maps.iter().rev() {
-            if map.foreground {
-                map_draw(&mut render, map, viewport);
-            }
-        }
-    }
-}
-
-fn entities_draw(g: &mut Engine, w: &mut World, viewport: Vec2) {
     // Sort entities by draw_order
     let mut ents: Vec<_> = w
         .iter_ents_ref()
@@ -68,11 +32,7 @@ fn entities_draw(g: &mut Engine, w: &mut World, viewport: Vec2) {
     }
 }
 
-pub fn update_world(g: &mut Engine, w: &mut World) {
-    entities_update(g, w);
-}
-
-fn entities_update(g: &mut Engine, w: &mut World) {
+pub fn update_entities(g: &mut Engine, w: &mut World) {
     // Update all entities
     let ents: Vec<_> = w.iter_ents().cloned().collect();
     let ents_count = ents.len();
@@ -262,7 +222,7 @@ pub trait EntHooks {
         let ent = w.get(ent)?;
         let sprite = ent.get::<Sprite>()?;
         let transform = ent.get::<Transform>()?;
-        g.render.borrow_mut().draw_image(
+        g.draw_image(
             sprite,
             transform.pos - viewport,
             Some(transform.scale),

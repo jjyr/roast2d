@@ -20,20 +20,3 @@ impl Rect {
         pos.x >= min.x && pos.y >= min.y && pos.x <= max.x && pos.y <= max.y
     }
 }
-
-/// SweepAxis
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum SweepAxis {
-    #[default]
-    X,
-    Y,
-}
-
-impl SweepAxis {
-    pub fn get(self, pos: Vec2) -> f32 {
-        match self {
-            Self::X => pos.x,
-            Self::Y => pos.y,
-        }
-    }
-}

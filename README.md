@@ -4,7 +4,7 @@
 [![Docs](https://docs.rs/roast2d/badge.svg)](https://docs.rs/roast2d/latest/roast2d/)
 [![CI](https://github.com/jjyr/roast2d/workflows/CI/badge.svg)](https://github.com/jjyr/roast2d/actions)
 
-Roast2D is a rapid development 2D game engine written in Rust. Inspired by [high_impact][high_impact].
+Roast2D is a rapid development 2D game engine written in Rust.
 
 I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d)
 
@@ -26,7 +26,7 @@ I wrote an article explaining [why Roast2D was made](https://jjydev.org/roast-2d
 Run example:
 
 ``` bash
-cargo run --example breakout
+cargo run -p example-breakout
 ```
 
 Add `roast2d` to Rust project:
@@ -56,7 +56,6 @@ The source code is licensed under MIT.
 [wasm-pack]: https://github.com/rustwasm/wasm-pack
 [SDL2]: https://github.com/Rust-SDL2/rust-sdl2?tab=readme-ov-file#sdl20-development-libraries
 [LDTK]: https://ldtk.io/
-[high_impact]: https://github.com/phoboslab/high_impact
 [breakout]: https://github.com/jjyr/roast2d/tree/master/examples
 [balloon]: https://github.com/jjyr/balloon-game
 [poor-man-ecs]: https://github.com/jjyr/roast2d/pull/14

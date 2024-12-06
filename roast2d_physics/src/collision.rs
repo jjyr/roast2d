@@ -1,21 +1,42 @@
+#![allow(clippy::too_many_arguments)]
+
+use roast2d::{
+    derive::Resource,
+    ecs::entity_ref::EntMut,
+    prelude::*,
+    sat::{calc_sat_overlap, SatRect},
+    transform::calc_bounds,
+};
 use std::f32::consts::PI;
 
 use glam::Vec2;
-use roast2d_derive::Resource;
+
+use crate::{
+    collision_map::CollisionMap,
+    entities::{get_ent_hooks, Commands},
+    physics::{entity_move, EntCollidesMode, EntPhysics, Physics},
+    sorts::insertion_sort_by_key,
+    trace::Trace,
+};
 
 const ENTITY_MIN_BOUNCE_VELOCITY: f32 = 10.0;
 
-use crate::{
-    ecs::{entity::Ent, entity_ref::EntMut, world::World},
-    engine::Engine,
-    entities::{get_ent_hooks, Commands},
-    physics::{entity_move, EntCollidesMode, EntPhysics, Physics},
-    prelude::{CollisionMap, Transform},
-    sat::{calc_sat_overlap, SatRect},
-    sorts::insertion_sort_by_key,
-    trace::Trace,
-    types::{Rect, SweepAxis},
-};
+/// SweepAxis
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Resource)]
+pub enum SweepAxis {
+    #[default]
+    X,
+    Y,
+}
+
+impl SweepAxis {
+    pub fn get(self, pos: Vec2) -> f32 {
+        match self {
+            Self::X => pos.x,
+            Self::Y => pos.y,
+        }
+    }
+}
 
 #[derive(Default, Resource)]
 pub struct CollisionSet {
@@ -47,9 +68,10 @@ impl CollisionSet {
     }
 }
 
-pub fn init_collision(_g: &mut Engine, w: &mut World) {
+pub fn init_collision(_g: &mut Engine, w: &mut World, sweep_axis: SweepAxis) {
     w.add_resource(CollisionSet::default());
     w.add_resource(CollisionMap::default());
+    w.add_resource(sweep_axis);
 }
 
 pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
@@ -60,7 +82,7 @@ pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
     // Sort by x or y position
     // insertion sort can gain better performance since list is sorted in every frames
 
-    let sweep_axis = g.sweep_axis;
+    let sweep_axis = *w.get_resource::<SweepAxis>().expect("get sweep axis");
     collision_set.sort_entities_for_sweep(w, sweep_axis);
 
     // Sweep touches
@@ -413,69 +435,6 @@ pub(crate) fn handle_trace_result(commands: &mut Commands, ent: &mut EntMut, t: 
     phy.vel = rotated_normal * vel_along_normal;
 }
 
-pub(crate) fn calc_bounds(pos: Vec2, half_size: Vec2, angle: f32) -> Rect {
-    const HF_PI: f32 = PI * 0.5;
-
-    if angle == 0.0 || angle.abs() == PI {
-        let min = pos - half_size;
-        let max = pos + half_size;
-        Rect { min, max }
-    } else if angle.abs() == HF_PI {
-        let half_size = Vec2 {
-            x: half_size.y,
-            y: half_size.x,
-        };
-        let min = pos - half_size;
-        let max = pos + half_size;
-        Rect { min, max }
-    } else {
-        let rot = Vec2::from_angle(angle);
-        let p1 = Vec2::new(half_size.x, -half_size.y);
-        let p2 = half_size;
-        let p3 = Vec2::new(-half_size.x, half_size.y);
-        let p4 = -half_size;
-        if angle > 0. && angle < HF_PI {
-            let max_x = rot.rotate(p1).x;
-            let min_x = rot.rotate(p3).x;
-            let max_y = rot.rotate(p2).y;
-            let min_y = rot.rotate(p4).y;
-            Rect {
-                min: pos + Vec2::new(min_x, min_y),
-                max: pos + Vec2::new(max_x, max_y),
-            }
-        } else if angle > HF_PI && angle < PI {
-            let max_x = rot.rotate(p4).x;
-            let min_x = rot.rotate(p2).x;
-            let max_y = rot.rotate(p1).y;
-            let min_y = rot.rotate(p3).y;
-            Rect {
-                min: pos + Vec2::new(min_x, min_y),
-                max: pos + Vec2::new(max_x, max_y),
-            }
-        } else if angle > -PI && angle < -HF_PI {
-            let max_x = rot.rotate(p3).x;
-            let min_x = rot.rotate(p1).x;
-            let max_y = rot.rotate(p4).y;
-            let min_y = rot.rotate(p2).y;
-            Rect {
-                min: pos + Vec2::new(min_x, min_y),
-                max: pos + Vec2::new(max_x, max_y),
-            }
-        } else if angle > -HF_PI && angle < 0.0 {
-            let max_x = rot.rotate(p2).x;
-            let min_x = rot.rotate(p4).x;
-            let max_y = rot.rotate(p3).y;
-            let min_y = rot.rotate(p1).y;
-            Rect {
-                min: pos + Vec2::new(min_x, min_y),
-                max: pos + Vec2::new(max_x, max_y),
-            }
-        } else {
-            panic!("Unnormalized angle {angle}")
-        }
-    }
-}
-
 pub(crate) fn calc_ent_overlap(w: &mut World, ent1: Ent, ent2: Ent) -> Option<Vec2> {
     let [ent1, ent2] = w.many([ent1, ent2]);
     let t1 = ent1.get::<Transform>().ok()?;
@@ -551,9 +510,8 @@ pub(crate) fn is_right_angle(angle: f32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use glam::Vec2;
+    use roast2d::{prelude::glam::Vec2, transform::calc_bounds};
 
-    use super::calc_bounds;
     use super::Rect;
 
     #[test]
