@@ -1,7 +1,11 @@
 [package]
+authors = ["jjy"]
+description = "Roast2D physics"
 name = "roast2d_physics"
 version = "0.0.1"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/jjyr/roast2d"
 
 [dependencies]
 roast2d = { path = "..", version = "0.0" }
