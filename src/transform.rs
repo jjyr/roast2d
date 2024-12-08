@@ -5,7 +5,7 @@ use roast2d_derive::Component;
 
 use crate::types::Rect;
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub struct Transform {
     pub pos: Vec2,
     pub scale: Vec2,
