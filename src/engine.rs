@@ -16,7 +16,7 @@ use crate::{
     handle::Handle,
     input::InputState,
     platform::Platform,
-    render::{Render, ResizeMode, ScaleMode},
+    render::{Render, ScaleMode},
     sprite::Sprite,
     text_cache::{init_text_cache, TextCache},
 };
@@ -320,16 +320,6 @@ impl Engine {
     /// Set view size
     pub fn set_view_size(&mut self, size: Vec2) {
         self.render.borrow_mut().set_view_size(size)
-    }
-
-    /// Resize mode
-    pub fn resize_mode(&self) -> ResizeMode {
-        self.render.borrow().resize_mode()
-    }
-
-    /// Set resize mode
-    pub fn set_resize_mode(&mut self, mode: ResizeMode) {
-        self.render.borrow_mut().set_resize_mode(mode)
     }
 
     /// Scale mode

@@ -12,7 +12,7 @@ pub use crate::handle::Handle;
 pub use crate::health::Health;
 pub use crate::input::{ActionId, KeyCode, KeyState};
 pub use crate::map::Map;
-pub use crate::render::{ResizeMode, ScaleMode};
+pub use crate::render::ScaleMode;
 pub use crate::sprite::Sprite;
 pub use crate::transform::Transform;
 pub use crate::types::Rect;

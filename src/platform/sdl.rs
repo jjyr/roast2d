@@ -188,6 +188,7 @@ impl Platform for SDLPlatform {
             controller_subsystem,
             gamepad: None,
             wants_to_exit: false,
+            inv_window_scale: Vec2::ZERO,
         };
 
         event_handler.find_gamepad();
@@ -202,6 +203,10 @@ impl Platform for SDLPlatform {
         // platform_output_samplerate = obtained_spec.freq;
         engine.init(setup);
         engine.on_resize(event_handler.window.drawable_size().into());
+        event_handler.inv_window_scale = {
+            let (x, y) = event_handler.window.size();
+            engine.render.borrow().logical_size() / Vec2::new(x as f32, y as f32)
+        };
 
         while !event_handler.wants_to_exit {
             if let Err(err) = engine.handle_assets().await {
@@ -225,7 +230,7 @@ impl Platform for SDLPlatform {
 struct SDLEventHandler {
     sdl: Sdl,
     window: Window,
-    // video_subsystem: VideoSubsystem,
+    inv_window_scale: Vec2,
     controller_subsystem: GameControllerSubsystem,
     gamepad: Option<GameController>,
     wants_to_exit: bool,
@@ -362,7 +367,8 @@ impl SDLEventHandler {
                 }
                 Event::MouseMotion { x, y, .. } => {
                     // Mouse move
-                    engine.input.set_mouse_pos(Vec2::new(x as f32, y as f32));
+                    let mp = Vec2::new(x as f32, y as f32) * self.inv_window_scale;
+                    engine.input.set_mouse_pos(mp);
                 }
                 Event::Quit { .. } => {
                     self.wants_to_exit = true;
@@ -372,8 +378,15 @@ impl SDLEventHandler {
                         win_event,
                         WindowEvent::SizeChanged(..) | WindowEvent::Resized(..)
                     ) {
-                        let size = self.window.drawable_size();
-                        engine.render.borrow_mut().resize(size.into());
+                        engine
+                            .render
+                            .borrow_mut()
+                            .resize(self.window.drawable_size().into());
+
+                        self.inv_window_scale = {
+                            let (x, y) = self.window.size();
+                            engine.render.borrow().logical_size() / Vec2::new(x as f32, y as f32)
+                        };
                     }
                 }
                 _ => {}

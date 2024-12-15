@@ -9,25 +9,18 @@ use crate::{
 pub enum ScaleMode {
     #[default]
     None,
-    Discrete,
-    Exact,
-}
-
-#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
-pub struct ResizeMode {
-    pub width: bool,
-    pub height: bool,
+    FixedHeight,
+    FixedWidth,
 }
 
 /// Render subsystem
 pub(crate) struct Render {
     draw_calls: u32,
-    screen_scale: f32,
-    inv_screen_scale: f32,
+    pub(crate) screen_scale: f32,
+    pub(crate) inv_screen_scale: f32,
     pub(crate) screen_size: Vec2,
     logical_size: Vec2,
     scale_mode: ScaleMode,
-    resize_mode: ResizeMode,
     view_size: Vec2,
     pub(crate) platform: Box<dyn Platform + 'static>,
     pub(crate) default_font: Option<Handle>,
@@ -43,7 +36,6 @@ impl Render {
             logical_size: Vec2::default(),
             scale_mode: ScaleMode::default(),
             view_size: Vec2::new(1280.0, 720.0),
-            resize_mode: ResizeMode::default(),
             platform,
             default_font: None,
         }
@@ -165,27 +157,18 @@ impl Render {
     }
 
     pub(crate) fn resize(&mut self, size: UVec2) {
-        // Determine Zoom
-        if self.scale_mode == ScaleMode::None {
-            self.screen_scale = 1.0;
-        } else {
-            self.screen_scale =
-                (size.x as f32 / self.view_size.x).min(size.y as f32 / self.view_size.y);
-            if self.scale_mode == ScaleMode::Discrete {
-                self.screen_scale = self.screen_scale.floor().max(0.5);
+        self.screen_size = Vec2::new(size.x as f32, size.y as f32);
+        // calculate scale
+        match self.scale_mode {
+            ScaleMode::None => {
+                self.screen_scale = 1.0;
             }
-        }
-        // Determine size
-        if self.resize_mode.width {
-            self.screen_size.x = (size.x as f32).max(self.view_size.x);
-        } else {
-            self.screen_size.x = self.view_size.x * self.screen_scale;
-        }
-
-        if self.resize_mode.height {
-            self.screen_size.y = (size.y as f32).max(self.view_size.y);
-        } else {
-            self.screen_size.y = self.view_size.y * self.screen_scale;
+            ScaleMode::FixedHeight => {
+                self.screen_scale = size.y as f32 / self.view_size.y;
+            }
+            ScaleMode::FixedWidth => {
+                self.screen_scale = size.x as f32 / self.view_size.x;
+            }
         }
 
         self.logical_size.x = (self.screen_size.x / self.screen_scale).ceil();
@@ -228,14 +211,6 @@ impl Render {
 
     pub(crate) fn set_scale_mode(&mut self, mode: ScaleMode) {
         self.scale_mode = mode;
-    }
-
-    pub(crate) fn resize_mode(&self) -> ResizeMode {
-        self.resize_mode
-    }
-
-    pub(crate) fn set_resize_mode(&mut self, mode: ResizeMode) {
-        self.resize_mode = mode;
     }
 
     pub(crate) fn view_size(&self) -> Vec2 {
