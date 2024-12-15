@@ -8,20 +8,23 @@ use crate::{
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub enum ScaleMode {
     #[default]
-    None,
-    FixedHeight,
-    FixedWidth,
+    Window,
+    Fixed {
+        width: u32,
+        height: u32,
+    },
+    FixedHeight(u32),
+    FixedWidth(u32),
 }
 
 /// Render subsystem
 pub(crate) struct Render {
     draw_calls: u32,
-    pub(crate) screen_scale: f32,
-    pub(crate) inv_screen_scale: f32,
+    pub(crate) screen_scale: Vec2,
+    pub(crate) inv_screen_scale: Vec2,
     pub(crate) screen_size: Vec2,
     logical_size: Vec2,
     scale_mode: ScaleMode,
-    view_size: Vec2,
     pub(crate) platform: Box<dyn Platform + 'static>,
     pub(crate) default_font: Option<Handle>,
 }
@@ -30,12 +33,11 @@ impl Render {
     pub(crate) fn new(platform: Box<dyn Platform + 'static>) -> Self {
         Self {
             draw_calls: 0,
-            screen_scale: 1.0,
-            inv_screen_scale: 1.0,
+            screen_scale: Vec2::splat(1.0),
+            inv_screen_scale: Vec2::splat(1.0),
             screen_size: Vec2::default(),
             logical_size: Vec2::default(),
             scale_mode: ScaleMode::default(),
-            view_size: Vec2::new(1280.0, 720.0),
             platform,
             default_font: None,
         }
@@ -160,19 +162,22 @@ impl Render {
         self.screen_size = Vec2::new(size.x as f32, size.y as f32);
         // calculate scale
         match self.scale_mode {
-            ScaleMode::None => {
-                self.screen_scale = 1.0;
+            ScaleMode::Window => {
+                self.screen_scale = Vec2::splat(1.0);
             }
-            ScaleMode::FixedHeight => {
-                self.screen_scale = size.y as f32 / self.view_size.y;
+            ScaleMode::Fixed { width, height } => {
+                self.screen_scale =
+                    Vec2::new(size.x as f32 / width as f32, size.y as f32 / height as f32);
             }
-            ScaleMode::FixedWidth => {
-                self.screen_scale = size.x as f32 / self.view_size.x;
+            ScaleMode::FixedHeight(height) => {
+                self.screen_scale = Vec2::splat(size.y as f32 / height as f32);
+            }
+            ScaleMode::FixedWidth(width) => {
+                self.screen_scale = Vec2::splat(size.x as f32 / width as f32);
             }
         }
 
-        self.logical_size.x = (self.screen_size.x / self.screen_scale).ceil();
-        self.logical_size.y = (self.screen_size.y / self.screen_scale).ceil();
+        self.logical_size = (self.screen_size / self.screen_scale).ceil();
         self.inv_screen_scale = 1.0 / self.screen_scale;
     }
 
@@ -213,15 +218,7 @@ impl Render {
         self.scale_mode = mode;
     }
 
-    pub(crate) fn view_size(&self) -> Vec2 {
-        self.view_size
-    }
-
     pub(crate) fn logical_size(&self) -> Vec2 {
         self.logical_size
-    }
-
-    pub(crate) fn set_view_size(&mut self, size: Vec2) {
-        self.view_size = size;
     }
 }

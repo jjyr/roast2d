@@ -428,11 +428,9 @@ impl Scene for Demo {
 
 fn setup(g: &mut Engine, _w: &mut World) {
     // set resize and scale
-    g.set_view_size(Vec2::new(800.0, 600.0));
-    g.set_scale_mode(ScaleMode::Exact);
-    g.set_resize_mode(ResizeMode {
-        width: true,
-        height: true,
+    g.set_scale_mode(ScaleMode::Fixed {
+        width: 800,
+        height: 600,
     });
     g.set_scene(Demo::default());
 }

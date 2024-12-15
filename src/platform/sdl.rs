@@ -378,10 +378,7 @@ impl SDLEventHandler {
                         win_event,
                         WindowEvent::SizeChanged(..) | WindowEvent::Resized(..)
                     ) {
-                        engine
-                            .render
-                            .borrow_mut()
-                            .resize(self.window.drawable_size().into());
+                        engine.on_resize(self.window.drawable_size().into());
 
                         self.inv_window_scale = {
                             let (x, y) = self.window.size();

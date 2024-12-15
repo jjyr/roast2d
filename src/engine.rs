@@ -101,6 +101,7 @@ pub struct Engine {
 
     // states
     is_running: bool,
+    is_window_resized: bool,
     scene: Option<Box<dyn Scene>>,
     scene_next: Option<Box<dyn Scene>>,
     pub(crate) world: UnsafeCell<World>,
@@ -126,6 +127,7 @@ impl Engine {
             camera: Camera::default(),
             perf: Perf::default(),
             is_running: false,
+            is_window_resized: false,
             scene: None,
             scene_next: None,
             world: UnsafeCell::new(Default::default()),
@@ -314,15 +316,13 @@ impl Engine {
 
     /// View size
     pub fn view_size(&self) -> Vec2 {
-        self.render.borrow().view_size()
+        self.render.borrow().logical_size()
     }
 
-    /// Set view size
-    pub fn set_view_size(&mut self, size: Vec2) {
-        self.render.borrow_mut().set_view_size(size)
+    pub fn is_window_resized(&self) -> bool {
+        self.is_window_resized
     }
 
-    /// Scale mode
     pub fn scale_mode(&self) -> ScaleMode {
         self.render.borrow().scale_mode()
     }
@@ -389,6 +389,7 @@ impl Engine {
     #[allow(dead_code)]
     pub(crate) fn on_resize(&mut self, size: UVec2) {
         self.render.borrow_mut().resize(size);
+        self.is_window_resized = true;
     }
 
     /// Called per frame, the main update logic of engine
@@ -446,9 +447,8 @@ impl Engine {
         }
 
         self.perf.draw = (self.now() - time_real_now) - self.perf.update;
-
         self.input.clear();
-
+        self.is_window_resized = false;
         self.perf.total = self.now() - time_frame_start;
     }
 
