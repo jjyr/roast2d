@@ -2,6 +2,7 @@ use anyhow::Result;
 use glam::UVec2;
 
 use crate::{
+    app::App,
     color::Color,
     ecs::world::World,
     engine::Engine,
@@ -33,27 +34,18 @@ pub trait Platform {
     fn create_texture(&mut self, handle: Handle, data: Vec<u8>, size: UVec2);
     fn remove_texture(&mut self, handle_id: HandleId);
     #[allow(async_fn_in_trait)]
-    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(
-        title: String,
-        width: u32,
-        height: u32,
-        vsync: bool,
-        setup: Setup,
-    ) -> Result<()>
+    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(app: App, setup: Setup) -> Result<()>
     where
         Self: Sized;
 }
 
 pub(crate) async fn platform_run<Setup: FnOnce(&mut Engine, &mut World)>(
-    title: String,
-    width: u32,
-    height: u32,
-    vsync: bool,
+    app: App,
     setup: Setup,
 ) -> anyhow::Result<()> {
     #[cfg(target_arch = "wasm32")]
-    web::WebPlatform::run(title, width, height, vsync, setup).await?;
+    web::WebPlatform::run(app, setup).await?;
     #[cfg(not(target_arch = "wasm32"))]
-    sdl::SDLPlatform::run(title, width, height, vsync, setup).await?;
+    sdl::SDLPlatform::run(app, setup).await?;
     Ok(())
 }

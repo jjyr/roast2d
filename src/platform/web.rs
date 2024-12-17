@@ -17,6 +17,7 @@ use web_sys::{
 };
 
 use crate::{
+    app::App,
     color::{Color, WHITE},
     ecs::world::World,
     engine::Engine,
@@ -258,12 +259,16 @@ impl Platform for WebPlatform {
     }
 
     async fn run<Setup: FnOnce(&mut Engine, &mut World)>(
-        _title: String,
-        width: u32,
-        height: u32,
-        _vsync: bool,
+        app: App,
         setup: Setup,
     ) -> anyhow::Result<()> {
+        let App {
+            window: UVec2 {
+                x: width,
+                y: height,
+            },
+            ..
+        } = app;
         console_log::init_with_level(Level::Debug).unwrap();
         #[cfg(feature = "web-debug")]
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));

@@ -16,6 +16,7 @@ use sdl2::{
 };
 
 use crate::{
+    app::App,
     color::Color,
     ecs::world::World,
     engine::Engine,
@@ -154,25 +155,32 @@ impl Platform for SDLPlatform {
         self.textures.remove(&handle_id);
     }
 
-    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(
-        title: String,
-        width: u32,
-        height: u32,
-        vsync: bool,
-        setup: Setup,
-    ) -> Result<()> {
+    async fn run<Setup: FnOnce(&mut Engine, &mut World)>(app: App, setup: Setup) -> Result<()> {
+        let App {
+            title,
+            window: UVec2 {
+                x: width,
+                y: height,
+            },
+            vsync,
+            resizable,
+            fullscreen,
+        } = app;
         let sdl_ctx = sdl2::init().map_err(|err| anyhow!(err))?;
 
         let controller_subsystem = sdl_ctx.game_controller().map_err(|err| anyhow!(err))?;
-        let video_subsystem = sdl_ctx.video().map_err(|err| anyhow!(err))?;
-        let window = video_subsystem
-            .window(&title, width, height)
-            .position_centered()
-            .opengl()
-            .resizable()
-            .allow_highdpi()
-            .build()
-            .map_err(|err| anyhow!(err))?;
+        let window = {
+            let video_subsystem = sdl_ctx.video().map_err(|err| anyhow!(err))?;
+            let mut w = video_subsystem.window(&title, width, height);
+            w.position_centered().opengl().allow_highdpi();
+            if resizable {
+                w.resizable();
+            }
+            if fullscreen {
+                w.fullscreen();
+            }
+            w.build().map_err(|err| anyhow!(err))?
+        };
         let screen_buffer = {
             let mut builder = window.clone().into_canvas();
             if vsync {

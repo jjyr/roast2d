@@ -8,6 +8,8 @@ pub struct App {
     pub title: String,
     pub window: UVec2,
     pub vsync: bool,
+    pub resizable: bool,
+    pub fullscreen: bool,
 }
 
 impl Default for App {
@@ -16,6 +18,8 @@ impl Default for App {
             title: "Hello Roast2D".to_string(),
             window: UVec2::new(800, 600),
             vsync: false,
+            resizable: false,
+            fullscreen: false,
         }
     }
 }
@@ -36,16 +40,18 @@ impl App {
         self
     }
 
+    pub fn resizable(mut self, resizable: bool) -> Self {
+        self.resizable = resizable;
+        self
+    }
+
+    pub fn fullscreen(mut self, fullscreen: bool) -> Self {
+        self.fullscreen = fullscreen;
+        self
+    }
+
     /// Run the game
     pub async fn run<Setup: FnOnce(&mut Engine, &mut World)>(self, setup: Setup) -> Result<()> {
-        let App {
-            title,
-            window: UVec2 {
-                x: width,
-                y: height,
-            },
-            vsync,
-        } = self;
-        platform_run(title, width, height, vsync, setup).await
+        platform_run(self, setup).await
     }
 }
