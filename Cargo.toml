@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 name = "roast2d"
 repository = "https://github.com/jjyr/roast2d"
-version = "0.0.11"
+version = "0.0.12"
 
 [workspace]
 exclude = ["benches", "examples"]
