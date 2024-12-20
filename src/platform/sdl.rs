@@ -149,10 +149,17 @@ impl Platform for SDLPlatform {
             .unwrap();
 
         self.textures.insert(handle.id(), texture);
+        if self.textures.len() > 4096 {
+            log::warn!("Too many textures {}", self.textures.len());
+        }
     }
 
     fn remove_texture(&mut self, handle_id: HandleId) {
-        self.textures.remove(&handle_id);
+        if let Some(texture) = self.textures.remove(&handle_id) {
+            unsafe {
+                texture.destroy();
+            }
+        }
     }
 
     async fn run<Setup: FnOnce(&mut Engine, &mut World)>(app: App, setup: Setup) -> Result<()> {

@@ -86,7 +86,6 @@ pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
     collision_set.sort_entities_for_sweep(w, sweep_axis);
 
     // Sweep touches
-    g.perf.checks = 0;
     let ents_count = collision_set.ents.len();
     for i in 0..ents_count {
         let ent1 = collision_set.ents[i];
@@ -120,7 +119,6 @@ pub(crate) fn update_collision(g: &mut Engine, w: &mut World) {
                 if sweep_axis.get(ent2_bounds.min) > max_pos {
                     break;
                 }
-                g.perf.checks += 1;
                 if let Some(overlap) = calc_ent_overlap(w, ent1, ent2) {
                     let res = {
                         let [ent1, ent2] = w.many([ent1, ent2]);

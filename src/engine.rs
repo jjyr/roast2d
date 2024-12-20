@@ -32,9 +32,12 @@ const DEFAULT_FONT_BYTES: &[u8; 59164] = include_bytes!("../assets/Pixel Square 
 fn default_texture(g: &mut Engine) -> Handle {
     DEFAULT_TEXTURE
         .get_or_init(|| {
-            let handle = g.assets.alloc_handle();
             let data = vec![255, 255, 255, 255];
             let size = UVec2::splat(1);
+            let handle = g.assets.insert(Asset {
+                asset_type: AssetType::Texture,
+                bytes: None,
+            });
             g.with_platform(|p| {
                 p.create_texture(handle.clone(), data, size);
             });
@@ -58,11 +61,9 @@ pub trait Scene {
     fn cleanup(&mut self, _g: &mut Engine, _w: &mut World);
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Perf {
     pub entities: usize,
-    pub checks: usize,
-    // draw_calls: usize,
     pub update: f32,
     pub draw: f32,
     pub total: f32,
@@ -205,7 +206,10 @@ impl Engine {
         let text_cache = w
             .get_resource_mut::<TextCache>()
             .expect("can't get text cache");
-        let handle = self.assets.alloc_handle();
+        let handle = self.assets.insert(Asset {
+            asset_type: AssetType::Texture,
+            bytes: None,
+        });
         let size = self
             .render
             .borrow_mut()
@@ -429,6 +433,7 @@ impl Engine {
             scene.update(self, w);
             self.scene = Some(scene);
         }
+        self.perf.entities = w.ents_count();
 
         // Update camera
         let camera_follow = self.camera.follow.and_then(|ent_ref| w.get(ent_ref).ok());
@@ -438,7 +443,6 @@ impl Engine {
             camera_follow,
             self.bounds,
         );
-
         self.perf.update = self.now() - time_real_now;
 
         if let Some(mut scene) = self.scene.take() {

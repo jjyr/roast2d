@@ -35,7 +35,6 @@ pub fn draw_entities(g: &mut Engine, w: &mut World) {
 pub fn update_entities(g: &mut Engine, w: &mut World) {
     // Update all entities
     let ents: Vec<_> = w.iter_ents().cloned().collect();
-    let ents_count = ents.len();
     for ent in ents {
         let ent_hooks = get_ent_hooks(w, ent);
         if let Ok(hooks) = ent_hooks.as_ref() {
@@ -54,8 +53,6 @@ pub fn update_entities(g: &mut Engine, w: &mut World) {
 
     collision::update_collision(g, w);
     handle_commands(g, w);
-
-    g.perf.entities = ents_count;
 }
 
 /// Init commands

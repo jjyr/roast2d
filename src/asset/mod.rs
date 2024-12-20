@@ -74,7 +74,7 @@ impl AssetManager {
         }
     }
 
-    pub(crate) fn alloc_handle(&mut self) -> Handle {
+    fn alloc_handle(&mut self) -> Handle {
         let id = self.asset_id;
         self.asset_id += 1;
         let drop_sender = self.sender.clone();
@@ -89,12 +89,18 @@ impl AssetManager {
             asset_type,
         };
         self.pending.push(task);
+        if self.pending.len() > 4096 {
+            log::warn!("Too many pending tasks");
+        }
         handle
     }
 
     pub fn insert(&mut self, asset: Asset) -> Handle {
         let handle = self.alloc_handle();
         self.assets.insert(handle.id(), asset);
+        if self.assets.len() > 4096 {
+            log::warn!("Too many assets");
+        }
         handle
     }
 
