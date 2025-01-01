@@ -1,5 +1,5 @@
 use hashbrown::{HashMap, HashSet};
-use std::any::type_name;
+use std::{any::type_name, ops::Index};
 
 use crate::{ecs::entity::Ent, errors::Error};
 
@@ -124,6 +124,16 @@ impl World {
         } else {
             Err(Error::NoEntity)
         }
+    }
+
+    /// Get an entity ref
+    pub fn ent(&self, ent: Ent) -> EntRef {
+        self.get(ent).expect("entity")
+    }
+
+    /// Get an entity by ref
+    pub fn ent_mut(&mut self, ent: Ent) -> EntMut {
+        self.get_mut(ent).expect("entity_mut")
     }
 
     /// Get many entity
