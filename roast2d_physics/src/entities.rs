@@ -10,7 +10,6 @@ use std::any::Any;
 
 use anyhow::Result;
 use glam::Vec2;
-use serde_json::Value;
 
 pub fn draw_entities(g: &mut Engine, w: &mut World) {
     let viewport = g.viewport();
@@ -80,10 +79,6 @@ fn handle_command(g: &mut Engine, w: &mut World, command: Command) -> anyhow::Re
             let hooks = get_ent_hooks(w, ent)?;
             hooks.collide(g, w, ent, normal, trace.as_ref())?;
         }
-        Command::Setting { ent, settings } => {
-            let hooks = get_ent_hooks(w, ent)?;
-            hooks.settings(g, w, ent, settings)?;
-        }
         Command::KillEnt { ent } => {
             let mut ent_ref = w.get_mut(ent)?;
             if let Ok(health) = ent_ref.get_mut::<Health>() {
@@ -131,11 +126,6 @@ impl Commands {
         self.add(Command::Collide { ent, normal, trace });
     }
 
-    /// Setting an entity
-    pub fn setting(&mut self, ent: Ent, settings: serde_json::Value) {
-        self.add(Command::Setting { ent, settings });
-    }
-
     /// Kill an entity
     pub fn kill(&mut self, ent: Ent) {
         self.add(Command::KillEnt { ent });
@@ -167,10 +157,6 @@ pub(crate) enum Command {
         normal: Vec2,
         trace: Option<Trace>,
     },
-    Setting {
-        ent: Ent,
-        settings: Value,
-    },
     KillEnt {
         ent: Ent,
     },
@@ -193,17 +179,6 @@ pub(crate) enum Command {
 ///
 /// Use EntHooks to customize entity callback behaviors.
 pub trait EntHooks {
-    /// Load entity settings
-    fn settings(
-        &self,
-        _g: &mut Engine,
-        _w: &mut World,
-        _ent: Ent,
-        _settings: serde_json::Value,
-    ) -> Result<()> {
-        Ok(())
-    }
-
     /// Update callback is called before the entity_base_update
     fn update(&self, _g: &mut Engine, _w: &mut World, _ent: Ent) -> Result<()> {
         Ok(())

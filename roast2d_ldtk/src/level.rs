@@ -2,10 +2,7 @@ use anyhow::{anyhow, bail};
 use roast2d::map::Tile;
 use roast2d::prelude::*;
 
-use roast2d_physics::{
-    collision_map::{CollisionMap, DefaultCollisionRule, COLLISION_MAP},
-    entities::Commands,
-};
+use roast2d_physics::collision_map::{CollisionMap, DefaultCollisionRule, COLLISION_MAP};
 
 use crate::{
     ldtk::{LayerType, LdtkLevel, LdtkLevelLayerInstance, LdtkProject},
@@ -104,11 +101,12 @@ pub fn build_map_from_ldtk_layer(
 }
 
 /// Load level
-pub fn load_level(
+pub fn load_level<InitEntF: Fn(&mut World, &str, Transform, serde_json::Value) -> Result<Ent>>(
     g: &mut Engine,
     w: &mut World,
     proj: &LdtkProject,
     identifier: &str,
+    init_ent_func: InitEntF,
 ) -> Result<()> {
     let level = proj.get_level(identifier)?;
     let mut background_maps = BackgroundMaps::default();
@@ -140,24 +138,15 @@ pub fn load_level(
                         (ent_ins.px.0 + ent_ins.width / 2) as f32,
                         (ent_ins.px.1 + ent_ins.height / 2) as f32,
                     );
-                    let ent = {
-                        let identifier = &ent_ins.identifier;
-                        let mut ent = w.spawn();
-                        // add transform
-                        ent.add(Transform::new(
-                            pos,
-                            Vec2::new(ent_ins.width as f32, ent_ins.height as f32),
-                        ))
-                        // add same name component
-                        .add_by_name(identifier);
-                        ent.id()
-                    };
+                    let identifier = &ent_ins.identifier;
                     let settings = ent_ins
                         .field_instances
                         .iter()
                         .map(|f| (f.identifier.clone(), f.value.clone()))
                         .collect();
-                    w.get_resource_mut::<Commands>()?.setting(ent, settings);
+                    let transform =
+                        Transform::new(pos, Vec2::new(ent_ins.width as f32, ent_ins.height as f32));
+                    init_ent_func(w, identifier, transform, settings)?;
                 }
             }
             _ => {
