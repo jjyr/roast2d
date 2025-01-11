@@ -14,6 +14,11 @@ impl Color {
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self::rgba(r, g, b, 0xff)
     }
+
+    pub fn with_a(mut self, a: u8) -> Self {
+        self.a = a;
+        self
+    }
 }
 
 pub const WHITE: Color = Color::rgb(0xff, 0xff, 0xff);

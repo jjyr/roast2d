@@ -1,5 +1,5 @@
 use hashbrown::{HashMap, HashSet};
-use std::{any::type_name, ops::Index};
+use std::any::type_name;
 
 use crate::{ecs::entity::Ent, errors::Error};
 
@@ -9,8 +9,6 @@ use super::{
     resource::Resource,
     unsafe_world_ref::UnsafeWorldRef,
 };
-
-type NewComponentFunc = Box<dyn Fn() -> Box<dyn Component>>;
 
 /// World contains entities
 #[derive(Default)]
@@ -25,12 +23,10 @@ pub struct World {
     resources: HashMap<ComponentId, Box<dyn Resource>>,
     /// Component by name
     component_by_name: HashMap<String, ComponentId>,
-    /// New component funcs
-    new_component_funcs: HashMap<ComponentId, NewComponentFunc>,
 }
 
 impl World {
-    pub fn init_component<T: Component + Default + 'static>(&mut self) {
+    pub fn init_component<T: Component + 'static>(&mut self) {
         let component_id = ComponentId::of::<T>();
         let name = type_name::<T>()
             .split("::")
@@ -39,19 +35,12 @@ impl World {
         // insert component name
         self.component_by_name
             .insert(name.to_string(), component_id.clone());
-        // init function
-        self.new_component_funcs
-            .insert(component_id.clone(), Box::new(|| Box::new(T::default())));
         // init storage
         let _ = self.storage.try_insert(component_id, Default::default());
     }
 
     pub fn get_component_id_by_name(&self, name: &str) -> Option<ComponentId> {
         self.component_by_name.get(name).cloned()
-    }
-
-    pub(crate) fn new_component(&self, id: &ComponentId) -> Option<Box<dyn Component>> {
-        self.new_component_funcs.get(id).map(|func| func())
     }
 
     fn to_unsafe_world_ref(&self) -> UnsafeWorldRef {
