@@ -7,6 +7,7 @@ use roast2d_derive::Component;
 use crate::{
     color::{Color, WHITE},
     handle::Handle,
+    types::Rect,
 };
 
 impl Debug for Sprite {
@@ -21,6 +22,8 @@ impl Debug for Sprite {
 pub struct Sprite {
     /// texture
     pub texture: Handle,
+    /// src rect
+    pub src: Option<Rect>,
     /// size
     pub size: UVec2,
     /// color
@@ -43,6 +46,7 @@ impl Sprite {
         Self {
             texture,
             size,
+            src: None,
             color: WHITE,
             spacing: 0.0,
             padding: 0.0,

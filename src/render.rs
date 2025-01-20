@@ -101,7 +101,7 @@ impl Render {
         self.draw(
             &image.texture,
             image.color,
-            None,
+            image.src.clone(),
             dst,
             angle,
             image.flip_x,
